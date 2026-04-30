@@ -1,6 +1,7 @@
 import React, { useRef, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCVStore, TemplateType } from './store/useCVStore';
+import { useCVStore } from './store/useCVStore';
+import type { TemplateType } from './store/useCVStore';
 import { 
   Download, 
   Languages, 
