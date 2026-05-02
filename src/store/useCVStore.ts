@@ -27,6 +27,7 @@ export interface CVData {
     phone: string;
     address: string;
     summary: string;
+    photo?: string;
     linkedin?: string;
     portfolio?: string;
     github?: string;
@@ -36,7 +37,7 @@ export interface CVData {
   skills: string[];
 }
 
-export type TemplateType = 'modern' | 'minimal' | 'professional' | 'creative';
+export type TemplateType = 'executive' | 'tech' | 'creative' | 'standard';
 export type FontType = 'sans' | 'serif' | 'mono';
 
 interface CVStore {
@@ -65,48 +66,68 @@ interface CVStore {
 
 const initialData: CVData = {
   personalInfo: {
-    fullName: 'NGUYỄN VĂN A',
-    jobTitle: 'Senior Software Engineer',
-    email: 'nguyenvana@email.com',
-    phone: '090 123 4567',
-    address: 'Hà Nội, Việt Nam',
-    summary: 'Lập trình viên dày dặn kinh nghiệm với hơn 5 năm làm việc trong lĩnh vực phát triển web...',
-    linkedin: 'linkedin.com/in/nguyenvana',
-    portfolio: 'nguyenvana.dev',
-    github: 'github.com/nguyenvana',
+    fullName: 'ALEXANDER STERLING',
+    jobTitle: 'Chief Executive Officer',
+    email: 'alexander.s@sterling.co',
+    phone: '+1 (555) 019-2834',
+    address: 'San Francisco, CA',
+    summary: 'Visionary executive leader with over 15 years of experience scaling global technology operations. Proven track record in strategic restructuring, accelerating revenue growth by 300% across EMEA and APAC regions. Adept at navigating complex market dynamics and forging high-level strategic partnerships.',
+    linkedin: 'linkedin.com/in/alexsterling',
+    portfolio: 'sterling.co',
+    github: 'github.com/alexsterling',
   },
   experiences: [
     {
       id: uuidv4(),
-      company: 'Tech Solutions Inc.',
-      position: 'Lead Developer',
-      startDate: '2021-01',
+      company: 'Global Tech Holdings',
+      position: 'Chief Executive Officer',
+      startDate: '2018-01',
       endDate: 'Present',
       bulletPoints: [
-        'Dẫn dắt đội ngũ 5 thành viên phát triển hệ thống quản lý tài chính.',
-        'Tối ưu hóa hiệu suất cơ sở dữ liệu giúp giảm thời gian truy vấn 40%.',
+        'Spearheaded global restructuring initiative, resulting in a 40% reduction in operational redundancies.',
+        'Directed successful acquisition and integration of three international competitors.',
+        'Expanded market share by 25% in the first fiscal year through strategic product alignment.',
+      ],
+    },
+    {
+      id: uuidv4(),
+      company: 'Innovate Solutions Group',
+      position: 'Chief Operating Officer',
+      startDate: '2012-06',
+      endDate: '2017-12',
+      bulletPoints: [
+        'Architected scalable operational frameworks that supported 500% employee growth.',
+        'Maintained core profitability margins while doubling R&D investment.',
       ],
     }
   ],
   educations: [
     {
       id: uuidv4(),
-      school: 'Đại học Bách Khoa',
-      degree: 'Kỹ sư Công nghệ thông tin',
-      startDate: '2015-09',
-      endDate: '2019-06',
+      school: 'Harvard Business School',
+      degree: 'Master of Business Administration',
+      startDate: '2008-09',
+      endDate: '2010-06',
+    },
+    {
+      id: uuidv4(),
+      school: 'Stanford University',
+      degree: 'B.S. in Economics',
+      startDate: '2002-09',
+      endDate: '2006-06',
     }
   ],
-  skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL', 'Docker'],
+  skills: ['Strategic Planning', 'Global Operations', 'Mergers & Acquisitions', 'Innovation Management', 'Fiscal Responsibility'],
 };
 
 export const useCVStore = create<CVStore>()(
   persist(
     (set) => ({
       data: initialData,
-      language: 'vi',
-      currentTemplate: 'modern',
-      primaryColor: '#2563eb',
+      language: 'en',
+      currentTemplate: 'executive',
+      primaryColor: '#0061a4',
+
       fontFamily: 'sans',
       setLanguage: (lang) => set({ language: lang }),
       setTemplate: (template) => set({ currentTemplate: template }),
@@ -184,7 +205,7 @@ export const useCVStore = create<CVStore>()(
       importData: (data) => set({ data }),
     }),
     {
-      name: 'swiftcv-storage',
+      name: 'swiftcv-premium-v1',
     }
   )
 );

@@ -1,14 +1,9 @@
 @import "tailwindcss";
-
-:root {
-  --background: 220 33% 98%;
-  --foreground: 222 47% 11%;
-}
+@config "../tailwind.config.js";
 
 body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: theme('colors.background');
+  color: theme('colors.on-background');
 }
 
 @layer utilities {
@@ -19,11 +14,11 @@ body {
     background: transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #e2e8f0;
+    background: theme('colors.surface-variant');
     border-radius: 10px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #cbd5e1;
+    background: theme('colors.outline-variant');
   }
 }
 
@@ -51,16 +46,16 @@ body {
   }
 
   /* Reset layout để chỉ in phần CV */
-  main, aside, header, footer {
+  main, aside, header, footer, section:first-of-type {
     display: none !important;
   }
 
   div[ref="resumeRef"], 
-  .w-\[210mm\] {
+  .cv-paper {
     width: 210mm !important;
     height: 297mm !important;
     margin: 0 !important;
-    padding: 20mm !important;
+    padding: 0 !important; /* Managed by template */
     box-shadow: none !important;
     display: block !important;
     position: absolute;

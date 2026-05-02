@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SwiftCv - Experience Editor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;family=Noto+Serif:wght@400&amp;family=Space+Grotesk:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap');
+        .font-geist-mono { font-family: 'Geist Mono', monospace; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error-container": "#ffdad6",
+                        "primary": "#00497d",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#d6bee4",
+                        "on-primary-fixed-variant": "#00497d",
+                        "on-primary-container": "#c0dbff",
+                        "on-primary": "#FFFFFF",
+                        "on-secondary-fixed": "#101c2b",
+                        "on-secondary-fixed-variant": "#3c4858",
+                        "on-tertiary-container": "#e9d0f7",
+                        "surface-container-highest": "#e1e2e8",
+                        "surface-container-high": "#e6e8ee",
+                        "primary-fixed": "#d1e4ff",
+                        "inverse-primary": "#9fcaff",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#001d36",
+                        "on-tertiary-fixed": "#251431",
+                        "on-background": "#191c20",
+                        "on-tertiary": "#ffffff",
+                        "secondary-fixed-dim": "#bbc7db",
+                        "secondary": "#535f70",
+                        "primary-container": "#0061a4",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#2e3135",
+                        "surface-variant": "#DFE2EB",
+                        "surface-bright": "#f8f9ff",
+                        "on-secondary-container": "#596576",
+                        "surface-container": "#eceef4",
+                        "surface-tint": "#0061a4",
+                        "secondary-container": "#d7e3f8",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed": "#f3daff",
+                        "tertiary-container": "#6b5778",
+                        "secondary-fixed": "#d7e3f8",
+                        "primary-fixed-dim": "#9fcaff",
+                        "outline-variant": "#c1c7d2",
+                        "surface-container-low": "#f2f3fa",
+                        "on-surface-variant": "#414750",
+                        "on-tertiary-fixed-variant": "#523f5f",
+                        "background": "#f8f9ff",
+                        "surface": "#F8F9FF",
+                        "surface-dim": "#d8dae0",
+                        "on-surface": "#191c20",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#52405f",
+                        "inverse-on-surface": "#eff0f7",
+                        "outline": "#74777F"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "1.5rem",
+                        "component-gap": "1rem",
+                        "sidebar-width": "280px",
+                        "editor-max-width": "800px",
+                        "container-padding": "2rem"
+                    },
+                    "fontFamily": {
+                        "title-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "cv-serif": ["Noto Serif"],
+                        "display-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-small": ["Space Grotesk"]
+                    },
+                    "fontSize": {
+                        "title-md": ["16px", { "lineHeight": "24px", "letterSpacing": "0.15px", "fontWeight": "500" }],
+                        "headline-md": ["28px", { "lineHeight": "36px", "fontWeight": "500" }],
+                        "cv-serif": ["12px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "display-lg": ["57px", { "lineHeight": "64px", "letterSpacing": "-0.25px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-small": ["11px", { "lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col font-body-md overflow-hidden">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-6 h-16 bg-white dark:bg-slate-900 font-sans Inter antialiased docked full-width top-0 border-b border-b border-slate-200 dark:border-slate-800 flat no shadows z-50 shrink-0">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-black tracking-tight text-blue-700 dark:text-blue-400">SwiftCv</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-6 py-2 rounded-full border border-primary text-primary font-title-md text-title-md hover:bg-slate-50 transition-colors">Export</button>
+<button class="px-6 py-2 rounded-full bg-primary text-on-primary font-title-md text-title-md hover:opacity-90 transition-opacity flex items-center gap-2">
+                Download PDF
+                <span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+</header>
+<!-- Main Layout -->
+<div class="flex flex-1 h-[calc(100vh-64px)] overflow-hidden">
+<!-- SideNavBar (Used as Left Panel Editor - 40%) -->
+<aside class="w-[40%] bg-surface border-r border-outline-variant flex flex-col overflow-y-auto">
+<!-- Horizontal Tab Bar (Re-interpreting SideNavBar JSON for the left panel layout request) -->
+<div class="px-8 pt-8 pb-4">
+<nav class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+<button class="flex items-center gap-2 text-slate-600 dark:text-slate-400 px-4 py-2 rounded-full whitespace-nowrap hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors text-sm font-medium Inter">
+<span class="material-symbols-outlined text-[18px]">person</span>
+                        Personal
+                    </button>
+<button class="flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-100 rounded-full px-4 py-2 whitespace-nowrap text-sm font-medium Inter">
+<span class="material-symbols-outlined text-[18px]">work</span>
+                        Experience
+                    </button>
+<button class="flex items-center gap-2 text-slate-600 dark:text-slate-400 px-4 py-2 rounded-full whitespace-nowrap hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors text-sm font-medium Inter">
+<span class="material-symbols-outlined text-[18px]">school</span>
+                        Education
+                    </button>
+<button class="flex items-center gap-2 text-slate-600 dark:text-slate-400 px-4 py-2 rounded-full whitespace-nowrap hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors text-sm font-medium Inter">
+<span class="material-symbols-outlined text-[18px]">psychology</span>
+                        Skills
+                    </button>
+<button class="flex items-center gap-2 text-slate-600 dark:text-slate-400 px-4 py-2 rounded-full whitespace-nowrap hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors text-sm font-medium Inter">
+<span class="material-symbols-outlined text-[18px]">insights</span>
+                        AI Analysis
+                    </button>
+</nav>
+</div>
+<!-- Form Area -->
+<div class="px-8 pb-12 flex-1">
+<div class="mb-8">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Experience</h2>
+<p class="text-secondary font-body-md text-body-md">Detail your professional journey.</p>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 mb-6 shadow-sm">
+<div class="flex justify-between items-start mb-6">
+<h3 class="font-title-md text-title-md text-on-surface">Senior Frontend Engineer</h3>
+<div class="flex gap-2">
+<button class="text-secondary hover:text-primary transition-colors p-1 rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="text-secondary hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-4">
+<div class="col-span-2 sm:col-span-1 relative">
+<input class="block w-full px-4 py-3 bg-transparent border border-outline rounded-DEFAULT text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary peer placeholder-transparent" id="jobTitle1" placeholder="Job Title" type="text" value="Senior Frontend Engineer"/>
+<label class="absolute left-3 -top-2.5 bg-surface-container-lowest px-1 text-xs font-label-small text-outline peer-focus:text-primary transition-all peer-placeholder-shown:text-base peer-placeholder-shown:top-3 peer-focus:-top-2.5 peer-focus:text-xs" for="jobTitle1">Job Title</label>
+</div>
+<div class="col-span-2 sm:col-span-1 relative">
+<input class="block w-full px-4 py-3 bg-transparent border border-outline rounded-DEFAULT text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary peer placeholder-transparent" id="company1" placeholder="Company" type="text" value="TechNova Solutions"/>
+<label class="absolute left-3 -top-2.5 bg-surface-container-lowest px-1 text-xs font-label-small text-outline peer-focus:text-primary transition-all peer-placeholder-shown:text-base peer-placeholder-shown:top-3 peer-focus:-top-2.5 peer-focus:text-xs" for="company1">Company</label>
+</div>
+<div class="col-span-1 relative">
+<input class="block w-full px-4 py-3 bg-transparent border border-outline rounded-DEFAULT text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary peer placeholder-transparent" id="startDate1" placeholder="Start Date" type="text" value="Mar 2021"/>
+<label class="absolute left-3 -top-2.5 bg-surface-container-lowest px-1 text-xs font-label-small text-outline peer-focus:text-primary transition-all peer-placeholder-shown:text-base peer-placeholder-shown:top-3 peer-focus:-top-2.5 peer-focus:text-xs" for="startDate1">Start Date</label>
+</div>
+<div class="col-span-1 relative">
+<input class="block w-full px-4 py-3 bg-transparent border border-outline rounded-DEFAULT text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary peer placeholder-transparent" id="endDate1" placeholder="End Date" type="text" value="Present"/>
+<label class="absolute left-3 -top-2.5 bg-surface-container-lowest px-1 text-xs font-label-small text-outline peer-focus:text-primary transition-all peer-placeholder-shown:text-base peer-placeholder-shown:top-3 peer-focus:-top-2.5 peer-focus:text-xs" for="endDate1">End Date</label>
+</div>
+</div>
+<div class="relative mt-6">
+<textarea class="block w-full px-4 py-3 bg-transparent border border-outline rounded-DEFAULT text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary peer placeholder-transparent resize-none" id="description1" placeholder="Description" rows="4">Architected and implemented a scalable micro-frontend architecture using React and Webpack Module Federation, reducing initial load times by 40%. Led a team of 5 developers in rebuilding the core customer dashboard. Integrated complex data visualizations using D3.js, improving client reporting metrics by 25%.</textarea>
+<label class="absolute left-3 -top-2.5 bg-surface-container-lowest px-1 text-xs font-label-small text-outline peer-focus:text-primary transition-all peer-placeholder-shown:text-base peer-placeholder-shown:top-3 peer-focus:-top-2.5 peer-focus:text-xs" for="description1">Description &amp; Achievements</label>
+</div>
+<div class="mt-4 flex flex-wrap gap-2">
+<span class="inline-flex items-center px-3 py-1 rounded-full border border-surface-variant bg-surface-container-low text-xs font-medium text-secondary">React</span>
+<span class="inline-flex items-center px-3 py-1 rounded-full border border-surface-variant bg-surface-container-low text-xs font-medium text-secondary">TypeScript</span>
+<span class="inline-flex items-center px-3 py-1 rounded-full border border-surface-variant bg-surface-container-low text-xs font-medium text-secondary">Webpack</span>
+<button class="inline-flex items-center px-3 py-1 rounded-full border border-dashed border-outline text-xs font-medium text-outline hover:text-primary hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-[14px] mr-1">add</span> Add Skill
+                        </button>
+</div>
+</div>
+<button class="w-full py-4 border-2 border-dashed border-outline-variant rounded-lg text-secondary font-title-md text-title-md hover:bg-surface-container-low hover:border-outline hover:text-on-surface transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add_circle</span>
+                    Add Another Role
+                </button>
+</div>
+</aside>
+<!-- Right Panel (Canvas Preview - 60%) -->
+<main class="w-[60%] bg-surface-container-low flex justify-center items-start overflow-y-auto p-12">
+<!-- The Paper Document -->
+<div class="w-full max-w-[850px] bg-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] min-h-[1100px] flex overflow-hidden border border-surface-variant relative">
+<!-- Left: Skill Matrix (40%) -->
+<div class="w-[35%] bg-on-surface text-surface-container-lowest p-8 flex flex-col border-r border-secondary-fixed-variant/20">
+<div class="mb-12">
+<h1 class="font-headline-md text-[32px] leading-tight font-bold tracking-tight mb-2">ALEX<br/>CHEN</h1>
+<p class="font-geist-mono text-primary-fixed-dim text-sm uppercase tracking-widest">Frontend Architect</p>
+</div>
+<div class="mb-10">
+<h2 class="font-title-md text-sm uppercase tracking-widest text-secondary-fixed-dim mb-4 border-b border-secondary/30 pb-2">Contact</h2>
+<ul class="space-y-3 font-geist-mono text-[11px] text-surface-container">
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[14px] text-primary-fixed">mail</span>
+                                alex.chen@example.com
+                            </li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[14px] text-primary-fixed">language</span>
+                                alexchen.dev
+                            </li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[14px] text-primary-fixed">location_on</span>
+                                San Francisco, CA
+                            </li>
+</ul>
+</div>
+<div class="mb-10">
+<h2 class="font-title-md text-sm uppercase tracking-widest text-secondary-fixed-dim mb-4 border-b border-secondary/30 pb-2">Core Stack</h2>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-surface-variant/10 border border-surface-variant/20 rounded font-geist-mono text-[10px] text-surface-container-low">React / Next.js</span>
+<span class="px-2 py-1 bg-surface-variant/10 border border-surface-variant/20 rounded font-geist-mono text-[10px] text-surface-container-low">TypeScript</span>
+<span class="px-2 py-1 bg-surface-variant/10 border border-surface-variant/20 rounded font-geist-mono text-[10px] text-surface-container-low">Node.js</span>
+<span class="px-2 py-1 bg-surface-variant/10 border border-surface-variant/20 rounded font-geist-mono text-[10px] text-surface-container-low">GraphQL</span>
+<span class="px-2 py-1 bg-surface-variant/10 border border-surface-variant/20 rounded font-geist-mono text-[10px] text-surface-container-low">Tailwind CSS</span>
+<span class="px-2 py-1 bg-surface-variant/10 border border-surface-variant/20 rounded font-geist-mono text-[10px] text-surface-container-low">WebGL</span>
+</div>
+</div>
+</div>
+<!-- Right: Experience Details (60%) -->
+<div class="w-[65%] p-10 bg-white text-on-surface">
+<div class="mb-8">
+<p class="font-cv-serif text-secondary text-[13px] leading-relaxed">
+                            Passionate software engineer focused on building performant, accessible, and beautiful web experiences. Specialized in complex frontend architectures and design systems bridging the gap between engineering and user experience.
+                        </p>
+</div>
+<div class="relative">
+<h2 class="font-title-md text-sm uppercase tracking-widest text-primary mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">work_history</span>
+                            Experience
+                        </h2>
+<!-- Experience Item 1 -->
+<div class="mb-8 relative pl-6 border-l border-surface-variant">
+<div class="absolute w-2 h-2 rounded-full bg-primary -left-[4.5px] top-1.5"></div>
+<div class="flex justify-between items-baseline mb-1">
+<h3 class="font-title-md text-on-surface font-semibold text-[15px]">Senior Frontend Engineer</h3>
+<span class="font-geist-mono text-[11px] text-secondary">2021 — Present</span>
+</div>
+<div class="font-geist-mono text-[12px] text-primary mb-3">TechNova Solutions</div>
+<ul class="list-none space-y-2 font-cv-serif text-[12px] text-on-surface-variant mb-3">
+<li class="relative pl-3 before:content-['•'] before:absolute before:left-0 before:text-primary">
+                                    Architected and implemented a scalable micro-frontend architecture using <span class="font-geist-mono text-primary text-[10px] bg-primary/5 px-1 rounded">React</span> and <span class="font-geist-mono text-primary text-[10px] bg-primary/5 px-1 rounded">Webpack Module Federation</span>, reducing initial load times by 40%.
+                                </li>
+<li class="relative pl-3 before:content-['•'] before:absolute before:left-0 before:text-primary">
+                                    Led a team of 5 developers in rebuilding the core customer dashboard, establishing new code quality standards and testing protocols.
+                                </li>
+<li class="relative pl-3 before:content-['•'] before:absolute before:left-0 before:text-primary">
+                                    Integrated complex data visualizations using <span class="font-geist-mono text-primary text-[10px] bg-primary/5 px-1 rounded">D3.js</span>, improving client reporting metrics by 25%.
+                                </li>
+</ul>
+</div>
+<!-- Experience Item 2 -->
+<div class="mb-8 relative pl-6 border-l border-surface-variant">
+<div class="absolute w-2 h-2 rounded-full border border-primary bg-white -left-[4.5px] top-1.5"></div>
+<div class="flex justify-between items-baseline mb-1">
+<h3 class="font-title-md text-on-surface font-semibold text-[15px]">Frontend Developer</h3>
+<span class="font-geist-mono text-[11px] text-secondary">2018 — 2021</span>
+</div>
+<div class="font-geist-mono text-[12px] text-secondary mb-3">PixelForge Agency</div>
+<ul class="list-none space-y-2 font-cv-serif text-[12px] text-on-surface-variant">
+<li class="relative pl-3 before:content-['•'] before:absolute before:left-0 before:text-secondary">
+                                    Developed responsive, interactive marketing sites for Fortune 500 clients, ensuring cross-browser compatibility and strict accessibility compliance (WCAG 2.1 AA).
+                                </li>
+<li class="relative pl-3 before:content-['•'] before:absolute before:left-0 before:text-secondary">
+                                    Collaborated closely with design teams to translate high-fidelity Figma mocks into pixel-perfect components using <span class="font-geist-mono text-secondary text-[10px] bg-surface-variant/30 px-1 rounded">Vue.js</span> and <span class="font-geist-mono text-secondary text-[10px] bg-surface-variant/30 px-1 rounded">SCSS</span>.
+                                </li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

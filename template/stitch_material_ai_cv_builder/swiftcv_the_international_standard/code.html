@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SwiftCv - The International Standard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;family=Noto+Serif:wght@400;700&amp;family=Space+Grotesk:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error-container": "#ffdad6",
+                        "primary": "#00497d",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#d6bee4",
+                        "on-primary-fixed-variant": "#00497d",
+                        "on-primary-container": "#c0dbff",
+                        "on-primary": "#FFFFFF",
+                        "on-secondary-fixed": "#101c2b",
+                        "on-secondary-fixed-variant": "#3c4858",
+                        "on-tertiary-container": "#e9d0f7",
+                        "surface-container-highest": "#e1e2e8",
+                        "surface-container-high": "#e6e8ee",
+                        "primary-fixed": "#d1e4ff",
+                        "inverse-primary": "#9fcaff",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#001d36",
+                        "on-tertiary-fixed": "#251431",
+                        "on-background": "#191c20",
+                        "on-tertiary": "#ffffff",
+                        "secondary-fixed-dim": "#bbc7db",
+                        "secondary": "#535f70",
+                        "primary-container": "#0061a4",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#2e3135",
+                        "surface-variant": "#DFE2EB",
+                        "surface-bright": "#f8f9ff",
+                        "on-secondary-container": "#596576",
+                        "surface-container": "#eceef4",
+                        "surface-tint": "#0061a4",
+                        "secondary-container": "#d7e3f8",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed": "#f3daff",
+                        "tertiary-container": "#6b5778",
+                        "secondary-fixed": "#d7e3f8",
+                        "primary-fixed-dim": "#9fcaff",
+                        "outline-variant": "#c1c7d2",
+                        "surface-container-low": "#f2f3fa",
+                        "on-surface-variant": "#414750",
+                        "on-tertiary-fixed-variant": "#523f5f",
+                        "background": "#f8f9ff",
+                        "surface": "#F8F9FF",
+                        "surface-dim": "#d8dae0",
+                        "on-surface": "#191c20",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#52405f",
+                        "inverse-on-surface": "#eff0f7",
+                        "outline": "#74777F"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "1.5rem",
+                        "component-gap": "1rem",
+                        "sidebar-width": "280px",
+                        "editor-max-width": "800px",
+                        "container-padding": "2rem"
+                    },
+                    "fontFamily": {
+                        "title-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "cv-serif": ["Noto Serif"],
+                        "display-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-small": ["Space Grotesk"]
+                    },
+                    "fontSize": {
+                        "title-md": ["16px", {"lineHeight": "24px", "letterSpacing": "0.15px", "fontWeight": "500"}],
+                        "headline-md": ["28px", {"lineHeight": "36px", "fontWeight": "500"}],
+                        "cv-serif": ["12px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "display-lg": ["57px", {"lineHeight": "64px", "letterSpacing": "-0.25px", "fontWeight": "400"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "label-small": ["11px", {"lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md overflow-hidden">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-6 h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-50 shrink-0">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-black tracking-tight text-blue-700 dark:text-blue-400">SwiftCv</span>
+<div class="h-6 w-px bg-outline-variant mx-2"></div>
+<span class="font-title-md text-title-md text-on-surface-variant">The International Standard</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-5 py-2 rounded-full border border-primary text-primary font-title-md text-title-md hover:bg-slate-50 transition-colors">
+                Export
+            </button>
+<button class="px-5 py-2 rounded-full bg-primary text-on-primary font-title-md text-title-md hover:opacity-90 transition-opacity shadow-sm">
+                Download PDF
+            </button>
+</div>
+</header>
+<!-- Main Layout -->
+<main class="flex-1 flex overflow-hidden">
+<!-- Left Panel: Editor (40%) -->
+<section class="w-full md:w-[40%] bg-surface flex flex-col border-r border-outline-variant h-full overflow-hidden shrink-0">
+<!-- Horizontal Tab Bar (Replaces SideNav for this specific request, adapting the JSON content) -->
+<nav class="bg-white border-b border-outline-variant px-4 py-2 shrink-0 overflow-x-auto">
+<ul class="flex items-center gap-2 min-w-max">
+<li>
+<button class="flex items-center gap-2 text-slate-600 dark:text-slate-400 px-4 py-2 hover:bg-slate-50 rounded-full transition-colors font-title-md text-title-md">
+<span class="material-symbols-outlined">person</span>
+                            Personal
+                        </button>
+</li>
+<li>
+<button class="flex items-center gap-2 text-slate-600 dark:text-slate-400 px-4 py-2 hover:bg-slate-50 rounded-full transition-colors font-title-md text-title-md">
+<span class="material-symbols-outlined">work</span>
+                            Experience
+                        </button>
+</li>
+<li>
+<button class="flex items-center gap-2 bg-primary-container text-on-primary-container rounded-full px-4 py-2 font-title-md text-title-md opacity-100 transition-opacity">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">school</span>
+                            Education
+                        </button>
+</li>
+<li>
+<button class="flex items-center gap-2 text-slate-600 dark:text-slate-400 px-4 py-2 hover:bg-slate-50 rounded-full transition-colors font-title-md text-title-md">
+<span class="material-symbols-outlined">psychology</span>
+                            Skills
+                        </button>
+</li>
+<li>
+<button class="flex items-center gap-2 text-slate-600 dark:text-slate-400 px-4 py-2 hover:bg-slate-50 rounded-full transition-colors font-title-md text-title-md">
+<span class="material-symbols-outlined">insights</span>
+                            AI Analysis
+                        </button>
+</li>
+</ul>
+</nav>
+<!-- Editor Content Area -->
+<div class="flex-1 overflow-y-auto p-8 space-y-8">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Education History</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Detail your academic background to establish your foundation.</p>
+</div>
+<!-- Education Card 1 -->
+<div class="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm relative group">
+<button class="absolute top-4 right-4 text-on-surface-variant hover:text-error transition-colors p-2 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined">delete</span>
+</button>
+<div class="space-y-5">
+<div class="grid grid-cols-1 gap-5">
+<div class="relative">
+<label class="absolute -top-2 left-2 bg-surface-container-lowest px-1 font-label-small text-label-small text-primary">Institution Name</label>
+<input class="w-full px-4 py-3 rounded border-2 border-primary bg-transparent focus:outline-none focus:ring-0 font-body-md text-body-md text-on-surface" type="text" value="Stanford University"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-5">
+<div class="relative">
+<label class="absolute -top-2 left-2 bg-surface-container-lowest px-1 font-label-small text-label-small text-on-surface-variant">Degree</label>
+<input class="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface" type="text" value="Master of Science"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 left-2 bg-surface-container-lowest px-1 font-label-small text-label-small text-on-surface-variant">Field of Study</label>
+<input class="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface" type="text" value="Computer Science"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-5">
+<div class="relative">
+<label class="absolute -top-2 left-2 bg-surface-container-lowest px-1 font-label-small text-label-small text-on-surface-variant">Start Date</label>
+<input class="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface" type="month" value="2018-09"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 left-2 bg-surface-container-lowest px-1 font-label-small text-label-small text-on-surface-variant">End Date</label>
+<input class="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface" type="month" value="2020-06"/>
+</div>
+</div>
+<div class="relative">
+<label class="absolute -top-2 left-2 bg-surface-container-lowest px-1 font-label-small text-label-small text-on-surface-variant">Description (Optional)</label>
+<textarea class="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface resize-none" rows="3">Specialized in Artificial Intelligence and Human-Computer Interaction. GPA: 3.9/4.0.</textarea>
+</div>
+</div>
+</div>
+<!-- Education Card 2 (Collapsed state) -->
+<div class="bg-surface-container-lowest p-5 rounded-lg border border-outline-variant shadow-sm flex justify-between items-center cursor-pointer hover:bg-surface-container-low transition-colors">
+<div>
+<h4 class="font-title-md text-title-md text-on-surface">University of California, Berkeley</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Bachelor of Science in Electrical Engineering • 2014 - 2018</p>
+</div>
+<button class="p-2 text-on-surface-variant rounded-full hover:bg-surface-variant">
+<span class="material-symbols-outlined">edit</span>
+</button>
+</div>
+<button class="w-full py-4 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-primary font-title-md text-title-md hover:bg-primary-container/10 transition-colors">
+<span class="material-symbols-outlined">add</span>
+                    Add Education
+                </button>
+</div>
+</section>
+<!-- Right Panel: Canvas Preview (60%) -->
+<section class="hidden md:flex flex-col w-[60%] bg-surface-container-low p-8 overflow-y-auto items-center">
+<!-- Canvas Toolbar -->
+<div class="w-full max-w-[850px] flex justify-between items-center mb-6">
+<div class="flex items-center gap-2 bg-white rounded-full px-4 py-2 border border-outline-variant shadow-sm">
+<span class="w-3 h-3 rounded-full bg-green-500"></span>
+<span class="font-label-small text-label-small text-on-surface-variant">Auto-saved</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 bg-white rounded-full border border-outline-variant shadow-sm text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">zoom_in</span>
+</button>
+<span class="font-label-small text-label-small text-on-surface-variant w-12 text-center">100%</span>
+<button class="p-2 bg-white rounded-full border border-outline-variant shadow-sm text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">zoom_out</span>
+</button>
+</div>
+</div>
+<!-- The CV Paper (The International Standard) -->
+<div class="bg-white w-full max-w-[850px] min-h-[1100px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] ring-1 ring-black/5 flex flex-col font-cv-serif text-on-surface origin-top">
+<!-- CV Header -->
+<header class="border-b-2 border-primary pb-6 mb-6 p-10 pt-12">
+<h1 class="font-title-md text-display-lg font-bold text-on-surface tracking-tight leading-none mb-4">Sarah Jenkins</h1>
+<h2 class="font-title-md text-headline-md text-primary mb-6">Senior Product Designer</h2>
+<div class="flex flex-wrap gap-4 text-sm text-on-surface-variant font-title-md">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-primary">location_on</span>
+                            San Francisco, CA
+                        </div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-primary">mail</span>
+                            sarah.j@example.com
+                        </div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-primary">phone</span>
+                            +1 (555) 123-4567
+                        </div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-primary">link</span>
+                            linkedin.com/in/sarahj
+                        </div>
+</div>
+</header>
+<!-- CV Body 2-Column -->
+<div class="flex flex-1 px-10 pb-12 gap-10">
+<!-- Left Column (Meta & Secondary) -->
+<div class="w-1/3 flex flex-col gap-8 border-r border-outline-variant pr-8">
+<!-- Education Section (Highlighted in Preview based on Active Tab) -->
+<section class="relative bg-primary-container/10 -m-4 p-4 rounded border-l-4 border-primary">
+<h3 class="font-title-md text-title-md font-bold uppercase tracking-widest text-on-surface mb-4">Education</h3>
+<div class="mb-5">
+<h4 class="font-bold text-on-surface text-base">Stanford University</h4>
+<div class="text-primary font-medium text-sm mb-1">M.S. Computer Science</div>
+<div class="text-on-surface-variant text-xs mb-2">Sept 2018 - June 2020</div>
+<p class="text-sm text-on-surface-variant leading-relaxed">Specialized in Artificial Intelligence and Human-Computer Interaction. GPA: 3.9/4.0.</p>
+</div>
+<div>
+<h4 class="font-bold text-on-surface text-base">UC Berkeley</h4>
+<div class="text-primary font-medium text-sm mb-1">B.S. Electrical Eng.</div>
+<div class="text-on-surface-variant text-xs mb-2">Aug 2014 - May 2018</div>
+</div>
+</section>
+<section>
+<h3 class="font-title-md text-title-md font-bold uppercase tracking-widest text-on-surface mb-4 mt-4">Skills</h3>
+<ul class="flex flex-col gap-2 text-sm text-on-surface-variant">
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-primary rounded-full"></span>UI/UX Design</li>
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-primary rounded-full"></span>Design Systems</li>
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-primary rounded-full"></span>Prototyping</li>
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-primary rounded-full"></span>User Research</li>
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-primary rounded-full"></span>Figma / FigJam</li>
+</ul>
+</section>
+<section>
+<h3 class="font-title-md text-title-md font-bold uppercase tracking-widest text-on-surface mb-4 mt-4">Languages</h3>
+<ul class="flex flex-col gap-2 text-sm text-on-surface-variant">
+<li class="flex justify-between"><span>English</span> <span class="font-medium text-primary">Native</span></li>
+<li class="flex justify-between"><span>Spanish</span> <span class="font-medium text-primary">Fluent</span></li>
+<li class="flex justify-between"><span>French</span> <span class="font-medium text-primary">Basic</span></li>
+</ul>
+</section>
+</div>
+<!-- Right Column (Main Content) -->
+<div class="w-2/3 flex flex-col gap-8">
+<section>
+<h3 class="font-title-md text-title-md font-bold uppercase tracking-widest text-on-surface mb-4 border-b border-outline-variant pb-2">Professional Summary</h3>
+<p class="text-on-surface-variant leading-relaxed">
+                                Innovative and data-driven Senior Product Designer with 6+ years of experience leading cross-functional teams to build user-centric enterprise software. Proven track record of increasing user engagement and establishing robust design systems that streamline development workflows.
+                            </p>
+</section>
+<section>
+<h3 class="font-title-md text-title-md font-bold uppercase tracking-widest text-on-surface mb-4 border-b border-outline-variant pb-2">Experience</h3>
+<div class="mb-6">
+<div class="flex justify-between items-baseline mb-1">
+<h4 class="font-bold text-on-surface text-lg">TechNova Solutions</h4>
+<span class="text-sm text-primary font-medium">Jan 2021 - Present</span>
+</div>
+<div class="text-on-surface-variant italic mb-3">Senior Product Designer</div>
+<ul class="list-disc list-outside ml-4 text-on-surface-variant space-y-2 leading-relaxed">
+<li>Spearheaded the redesign of the core SaaS platform, resulting in a 40% increase in daily active users and a 25% reduction in customer support tickets.</li>
+<li>Established and maintained a comprehensive design system used by 50+ developers and designers across 4 product lines.</li>
+<li>Mentored 3 junior designers, facilitating regular design critiques and skill-building workshops.</li>
+</ul>
+</div>
+<div>
+<div class="flex justify-between items-baseline mb-1">
+<h4 class="font-bold text-on-surface text-lg">Creative Cloud Agency</h4>
+<span class="text-sm text-primary font-medium">Jul 2018 - Dec 2020</span>
+</div>
+<div class="text-on-surface-variant italic mb-3">UI/UX Designer</div>
+<ul class="list-disc list-outside ml-4 text-on-surface-variant space-y-2 leading-relaxed">
+<li>Designed responsive e-commerce experiences for Fortune 500 clients, driving an average 15% increase in conversion rates.</li>
+<li>Conducted extensive user research, including A/B testing and contextual inquiries, to inform design decisions.</li>
+</ul>
+</div>
+</section>
+</div>
+</div>
+</div>
+<div class="h-16 w-full shrink-0"></div> <!-- Bottom padding for scroll -->
+</section>
+</main>
+</body></html>
