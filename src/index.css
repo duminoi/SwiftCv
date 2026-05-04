@@ -63,3 +63,30 @@ body {
     left: 0;
   }
 }
+
+@layer components {
+  .cv-paper .prose ul,
+  .cv-paper .prose ul > li {
+    list-style-type: disc !important;
+  }
+  .cv-paper .prose ul {
+    padding-left: 1.25rem !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+  
+  .cv-paper .prose ol,
+  .cv-paper .prose ol > li {
+    list-style-type: decimal !important;
+  }
+  .cv-paper .prose ol {
+    padding-left: 1.25rem !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+  
+  .cv-paper .prose p {
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.25rem !important;
+  }
+}

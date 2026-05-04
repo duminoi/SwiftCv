@@ -3,6 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { useCVStore } from './store/useCVStore';
 import { useReactToPrint } from 'react-to-print';
 import { analyzeCV } from './store/cvAnalyzer';
+import { StandardTemplate } from './components/templates/StandardTemplate';
+import { MinimalistTemplate } from './components/templates/MinimalistTemplate';
+import { PixelsTemplate } from './components/templates/PixelsTemplate';
+import { CreativeTemplate } from './components/templates/CreativeTemplate';
+import { RichTextEditor } from './components/RichTextEditor';
 import './i18n';
 
 // --- Sub-components ---
@@ -52,10 +57,12 @@ function App() {
     addSkill,
     removeSkill,
     language, 
-    setLanguage
+    setLanguage,
+    currentTemplate,
+    setTemplate
   } = useCVStore();
   
-  const [activeTab, setActiveTab] = useState<'personal' | 'experience' | 'education' | 'skills' | 'analysis'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'experience' | 'education' | 'skills' | 'analysis' | 'templates'>('personal');
   const [newSkill, setNewSkill] = useState('');
   const resumeRef = useRef<HTMLDivElement>(null);
 
@@ -76,6 +83,7 @@ function App() {
 
   const tabs = [
     { id: 'personal', label: t('sections.personal'), icon: 'person' },
+    { id: 'templates', label: 'Templates', icon: 'palette' },
     { id: 'experience', label: t('sections.experience'), icon: 'work' },
     { id: 'education', label: t('sections.education'), icon: 'school' },
     { id: 'skills', label: t('sections.skills') || 'Skills', icon: 'psychology' },
@@ -105,7 +113,12 @@ function App() {
                 <InputField label="LinkedIn" value={data.personalInfo.linkedin} onChange={(v: any) => updatePersonalInfo({ linkedin: v })} />
                 <InputField label="GitHub" value={data.personalInfo.github} onChange={(v: any) => updatePersonalInfo({ github: v })} />
               </div>
-              <InputField label={t('sections.summary')} value={data.personalInfo.summary} onChange={(v: any) => updatePersonalInfo({ summary: v })} rows={4} />
+              <RichTextEditor 
+                label={t('sections.summary')} 
+                content={data.personalInfo.summary} 
+                onChange={(v) => updatePersonalInfo({ summary: v })} 
+                placeholder="Write a brief professional summary..."
+              />
             </div>
           </div>
         );
@@ -117,10 +130,11 @@ function App() {
               <p className="font-body-md text-body-md text-on-surface-variant">Detail your work experience.</p>
             </div>
             {data.experiences.map((exp) => (
-              <div key={exp.id} className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm relative group">
+              <div key={exp.id} className="bg-surface-container-lowest p-6 pt-12 rounded-lg border border-outline-variant shadow-sm relative group">
                 <button
                   onClick={() => removeExperience(exp.id)}
-                  className="absolute top-4 right-4 text-on-surface-variant hover:text-error transition-colors p-2 rounded-full hover:bg-error-container opacity-0 group-hover:opacity-100"
+                  className="absolute top-2 right-2 text-on-surface-variant hover:text-error transition-colors p-2 rounded-full hover:bg-error-container opacity-0 group-hover:opacity-100 z-10"
+                  title="Remove Experience"
                 >
                   <Icon name="delete" />
                 </button>
@@ -133,7 +147,12 @@ function App() {
                     <InputField label={t('labels.startDate')} value={exp.startDate} onChange={(v: any) => updateExperience(exp.id, { startDate: v })} />
                     <InputField label={t('labels.endDate')} value={exp.endDate} onChange={(v: any) => updateExperience(exp.id, { endDate: v })} />
                   </div>
-                  <InputField label={t('labels.description')} value={exp.bulletPoints.join('\n')} onChange={(v: any) => updateExperience(exp.id, { bulletPoints: v.split('\n') })} rows={4} />
+                  <RichTextEditor 
+                    label={t('labels.description')} 
+                    content={exp.bulletPoints} 
+                    onChange={(v) => updateExperience(exp.id, { bulletPoints: v })} 
+                    placeholder="Describe your responsibilities and achievements..."
+                  />
                 </div>
               </div>
             ))}
@@ -151,10 +170,11 @@ function App() {
               <p className="font-body-md text-body-md text-on-surface-variant">Detail your academic background to establish your foundation.</p>
             </div>
             {data.educations.map((edu) => (
-              <div key={edu.id} className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm relative group">
+              <div key={edu.id} className="bg-surface-container-lowest p-6 pt-12 rounded-lg border border-outline-variant shadow-sm relative group">
                 <button
                   onClick={() => removeEducation(edu.id)}
-                  className="absolute top-4 right-4 text-on-surface-variant hover:text-error transition-colors p-2 rounded-full hover:bg-error-container opacity-0 group-hover:opacity-100"
+                  className="absolute top-2 right-2 text-on-surface-variant hover:text-error transition-colors p-2 rounded-full hover:bg-error-container opacity-0 group-hover:opacity-100 z-10"
+                  title="Remove Education"
                 >
                   <Icon name="delete" />
                 </button>
@@ -245,6 +265,35 @@ function App() {
             </div>
           </div>
         );
+      case 'templates':
+        return (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <div>
+              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">Templates</h2>
+              <p className="font-body-md text-body-md text-on-surface-variant">Choose a design for your CV.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { id: 'standard', name: 'The International Standard' },
+                { id: 'executive', name: 'The Minimalist CEO' },
+                { id: 'tech', name: 'The Pixels Code' },
+                { id: 'creative', name: 'The Creative Portfolio' }
+              ].map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setTemplate(t.id as any)}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    currentTemplate === t.id 
+                      ? 'border-primary bg-primary-container/20 ring-2 ring-primary/20' 
+                      : 'border-outline-variant hover:border-primary/50'
+                  }`}
+                >
+                  <div className="font-title-md text-title-md text-on-surface font-bold">{t.name}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
       default:
         return null;
     }
@@ -331,102 +380,12 @@ function App() {
           {/* The CV Paper */}
           <div 
             ref={resumeRef}
-            className="cv-paper bg-white w-full max-w-[850px] min-h-[1100px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] ring-1 ring-black/5 flex flex-col font-cv-serif text-on-surface origin-top"
+            className="cv-paper bg-white w-full max-w-[850px] min-h-[1100px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] ring-1 ring-black/5 flex flex-col font-cv-serif text-on-surface origin-top overflow-hidden"
           >
-            {/* CV Header */}
-            <header className="border-b-2 border-primary pb-6 mb-6 p-10 pt-12">
-              <h1 className="font-title-md text-display-lg font-bold text-on-surface tracking-tight leading-none mb-4">{data.personalInfo.fullName || 'YOUR NAME'}</h1>
-              <h2 className="font-title-md text-headline-md text-primary mb-6">{data.personalInfo.jobTitle || 'Job Title'}</h2>
-              
-              <div className="flex flex-wrap gap-4 text-sm text-on-surface-variant font-title-md">
-                <div className="flex items-center gap-1">
-                  <Icon name="location_on" className="text-[16px] text-primary" />
-                  {data.personalInfo.address || 'Location'}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Icon name="mail" className="text-[16px] text-primary" />
-                  {data.personalInfo.email || 'Email'}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Icon name="phone" className="text-[16px] text-primary" />
-                  {data.personalInfo.phone || 'Phone'}
-                </div>
-                {data.personalInfo.linkedin && (
-                  <div className="flex items-center gap-1">
-                    <Icon name="link" className="text-[16px] text-primary" />
-                    {data.personalInfo.linkedin}
-                  </div>
-                )}
-                {data.personalInfo.github && (
-                  <div className="flex items-center gap-1">
-                    <Icon name="link" className="text-[16px] text-primary" />
-                    {data.personalInfo.github}
-                  </div>
-                )}
-              </div>
-            </header>
-
-            {/* CV Body 2-Column */}
-            <div className="flex flex-1 px-10 pb-12 gap-10">
-              {/* Left Column (Meta & Secondary) */}
-              <div className="w-1/3 flex flex-col gap-8 border-r border-outline-variant pr-8">
-                {/* Education Section */}
-                <section className="relative bg-primary-container/10 -m-4 p-4 rounded border-l-4 border-primary">
-                  <h3 className="font-title-md text-title-md font-bold uppercase tracking-widest text-on-surface mb-4">Education</h3>
-                  {data.educations.map((edu) => (
-                    <div key={edu.id} className="mb-5 last:mb-0">
-                      <h4 className="font-bold text-on-surface text-base">{edu.school || 'School'}</h4>
-                      <div className="text-primary font-medium text-sm mb-1">{edu.degree || 'Degree'}</div>
-                      <div className="text-on-surface-variant text-xs mb-2">{edu.startDate} - {edu.endDate}</div>
-                    </div>
-                  ))}
-                </section>
-
-                <section>
-                  <h3 className="font-title-md text-title-md font-bold uppercase tracking-widest text-on-surface mb-4 mt-4">Skills</h3>
-                  <ul className="flex flex-col gap-2 text-sm text-on-surface-variant">
-                    {data.skills.map((skill, i) => (
-                      <li key={i} className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-primary rounded-full shrink-0"></span>
-                        {skill}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              </div>
-
-              {/* Right Column (Main Content) */}
-              <div className="w-2/3 flex flex-col gap-8">
-                {data.personalInfo.summary && (
-                  <section>
-                    <h3 className="font-title-md text-title-md font-bold uppercase tracking-widest text-on-surface mb-4 border-b border-outline-variant pb-2">Professional Summary</h3>
-                    <p className="text-on-surface-variant leading-relaxed">
-                      {data.personalInfo.summary}
-                    </p>
-                  </section>
-                )}
-
-                <section>
-                  <h3 className="font-title-md text-title-md font-bold uppercase tracking-widest text-on-surface mb-4 border-b border-outline-variant pb-2">Experience</h3>
-                  <div className="flex flex-col gap-6">
-                    {data.experiences.map((exp) => (
-                      <div key={exp.id}>
-                        <div className="flex justify-between items-baseline mb-1">
-                          <h4 className="font-bold text-on-surface text-lg">{exp.company || 'Company'}</h4>
-                          <span className="text-sm text-primary font-medium">{exp.startDate} - {exp.endDate}</span>
-                        </div>
-                        <div className="text-on-surface-variant italic mb-3">{exp.position || 'Position'}</div>
-                        <ul className="list-disc list-outside ml-4 text-on-surface-variant space-y-2 leading-relaxed">
-                          {exp.bulletPoints.map((point, idx) => point.trim() && (
-                            <li key={idx}>{point}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </div>
-            </div>
+            {currentTemplate === 'standard' && <StandardTemplate data={data} />}
+            {currentTemplate === 'executive' && <MinimalistTemplate data={data} />}
+            {currentTemplate === 'tech' && <PixelsTemplate data={data} />}
+            {currentTemplate === 'creative' && <CreativeTemplate data={data} />}
           </div>
           <div className="h-16 w-full shrink-0 no-print"></div>
         </section>

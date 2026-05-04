@@ -75,7 +75,8 @@ export default {
         "cv-serif": ["Noto Serif", "serif"],
         "display-lg": ["Inter", "sans-serif"],
         "body-md": ["Inter", "sans-serif"],
-        "label-small": ["Space Grotesk", "sans-serif"]
+        "label-small": ["Space Grotesk", "sans-serif"],
+        "geist-mono": ["Geist Mono", "monospace"]
       },
       fontSize: {
         "title-md": ["16px", { lineHeight: "24px", letterSpacing: "0.15px", fontWeight: "500" }],

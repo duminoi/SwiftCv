@@ -8,7 +8,7 @@ export interface Experience {
   position: string;
   startDate: string;
   endDate: string;
-  bulletPoints: string[];
+  bulletPoints: string;
 }
 
 export interface Education {
@@ -83,11 +83,7 @@ const initialData: CVData = {
       position: 'Chief Executive Officer',
       startDate: '2018-01',
       endDate: 'Present',
-      bulletPoints: [
-        'Spearheaded global restructuring initiative, resulting in a 40% reduction in operational redundancies.',
-        'Directed successful acquisition and integration of three international competitors.',
-        'Expanded market share by 25% in the first fiscal year through strategic product alignment.',
-      ],
+      bulletPoints: '<ul><li>Spearheaded global restructuring initiative, resulting in a 40% reduction in operational redundancies.</li><li>Directed successful acquisition and integration of three international competitors.</li><li>Expanded market share by 25% in the first fiscal year through strategic product alignment.</li></ul>',
     },
     {
       id: uuidv4(),
@@ -95,10 +91,7 @@ const initialData: CVData = {
       position: 'Chief Operating Officer',
       startDate: '2012-06',
       endDate: '2017-12',
-      bulletPoints: [
-        'Architected scalable operational frameworks that supported 500% employee growth.',
-        'Maintained core profitability margins while doubling R&D investment.',
-      ],
+      bulletPoints: '<ul><li>Architected scalable operational frameworks that supported 500% employee growth.</li><li>Maintained core profitability margins while doubling R&D investment.</li></ul>',
     }
   ],
   educations: [
@@ -143,7 +136,7 @@ export const useCVStore = create<CVStore>()(
             ...state.data,
             experiences: [
               ...state.data.experiences,
-              { id: uuidv4(), company: '', position: '', startDate: '', endDate: '', bulletPoints: [''] },
+              { id: uuidv4(), company: '', position: '', startDate: '', endDate: '', bulletPoints: '' },
             ],
           },
         })),
@@ -206,6 +199,23 @@ export const useCVStore = create<CVStore>()(
     }),
     {
       name: 'swiftcv-premium-v1',
+      version: 1,
+      migrate: (persistedState: any, version: number) => {
+        if (version === 0) {
+          if (persistedState.data && Array.isArray(persistedState.data.experiences)) {
+            persistedState.data.experiences = persistedState.data.experiences.map((exp: any) => {
+              if (Array.isArray(exp.bulletPoints)) {
+                return {
+                  ...exp,
+                  bulletPoints: `<ul>${exp.bulletPoints.map((p: string) => `<li>${p}</li>`).join('')}</ul>`
+                };
+              }
+              return exp;
+            });
+          }
+        }
+        return persistedState;
+      },
     }
   )
 );

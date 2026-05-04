@@ -59,14 +59,28 @@ export const analyzeCV = (data: CVData, lang: 'en' | 'vi'): ScoreResult => {
     experiences.forEach(exp => {
       if (exp.company && exp.position) expPoints += 5;
       
-      // Bullet points analysis
-      const bullets = exp.bulletPoints || [];
-      const validBullets = bullets.filter(p => p.trim().length > 20);
+      // Handle Rich Text Bullet points (strip HTML and split by list items or paragraphs)
+      let rawBullets = exp.bulletPoints;
+      if (Array.isArray(rawBullets)) {
+        rawBullets = rawBullets.join('\n');
+      } else if (typeof rawBullets !== 'string') {
+        rawBullets = '';
+      }
+
+      const bulletText = rawBullets
+        .replace(/<\/li>/g, '\n') // Replace closing li with newline
+        .replace(/<\/p>/g, '\n')  // Replace closing p with newline
+        .replace(/<[^>]*>/g, '')  // Strip all other HTML tags
+        .trim();
+        
+      const bullets = bulletText.split('\n').filter((p: string) => p.trim().length > 0);
+      const validBullets = bullets.filter((p: string) => p.trim().length > 20);
+      
       if (validBullets.length >= 3) expPoints += 10;
       else if (validBullets.length > 0) expPoints += 5;
 
       // Metrics check (Numbers, percentages, currency)
-      const hasMetrics = bullets.some(p => /[\d%]+/.test(p) || /\$\d+/.test(p));
+      const hasMetrics = bullets.some((p: string) => /[\d%]+/.test(p) || /\$\d+/.test(p));
       if (hasMetrics) expPoints += 5;
       else if (bullets.length > 0) {
         suggestions.push(lang === 'vi' ? `Thêm số liệu (%, $, số lượng) vào kinh nghiệm tại ${exp.company}.` : `Add quantifiable metrics (%, $, numbers) to your role at ${exp.company}.`);
