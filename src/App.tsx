@@ -302,11 +302,13 @@ function App() {
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md overflow-hidden">
       {/* TopAppBar */}
-      <header className="flex justify-between items-center w-full px-6 h-16 bg-white dark:bg-slate-900 border-b border-outline-variant z-50 shrink-0">
+      <header className="h-[72px] bg-surface flex items-center justify-between px-6 border-b border-surface-variant shrink-0">
         <div className="flex items-center gap-4">
-          <span className="text-2xl font-black tracking-tight text-primary">SwiftCv</span>
-          <div className="h-6 w-px bg-outline-variant mx-2"></div>
-          <span className="font-title-md text-title-md text-on-surface-variant">The International Standard</span>
+          <div className="text-primary font-bold text-xl tracking-tight flex items-center gap-1">
+            SwiftCv
+          </div>
+          <div className="w-px h-6 bg-surface-variant"></div>
+          <span className="text-on-surface-variant font-medium">The International Standard</span>
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -315,13 +317,13 @@ function App() {
               setLanguage(newLang);
               i18n.changeLanguage(newLang);
             }}
-            className="px-5 py-2 rounded-full border border-primary text-primary font-title-md text-title-md hover:bg-slate-50 transition-colors uppercase"
+            className="h-10 px-6 rounded-full border border-outline text-primary font-medium hover:bg-primary/5 transition-colors uppercase"
           >
             {language}
           </button>
           <button 
             onClick={() => handlePrint()}
-            className="px-5 py-2 rounded-full bg-primary text-on-primary font-title-md text-title-md hover:opacity-90 transition-opacity shadow-sm"
+            className="h-10 px-6 rounded-full bg-primary text-on-primary font-medium hover:bg-primary/90 transition-colors shadow-sm"
           >
             Download PDF
           </button>
@@ -332,22 +334,30 @@ function App() {
       <main className="flex-1 flex overflow-hidden">
         {/* Left Panel: Editor (40%) */}
         <section className="w-full md:w-[40%] bg-surface flex flex-col border-r border-outline-variant h-full overflow-hidden shrink-0">
-          <nav className="bg-white border-b border-outline-variant px-4 py-2 shrink-0 overflow-x-auto custom-scrollbar">
-            <ul className="flex items-center gap-2 min-w-max">
-              {tabs.map((tab) => (
-                <li key={tab.id}>
-                  <button
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full font-title-md text-title-md transition-all ${
-                      activeTab === tab.id 
-                        ? 'bg-primary-container text-on-primary-container' 
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Icon name={tab.icon} filled={activeTab === tab.id} />
-                    {tab.label}
-                  </button>
-                </li>
+          <nav className="h-16 border-b border-surface-variant flex items-center px-4 gap-2 bg-surface overflow-x-auto no-scrollbar shrink-0">
+            <ul className="flex items-center gap-2 min-w-max w-full">
+              {tabs.map((tab, index) => (
+                <React.Fragment key={tab.id}>
+                  {tab.id === 'analysis' && <div className="flex-1"></div>}
+                  <li>
+                    <button
+                      onClick={() => setActiveTab(tab.id as any)}
+                      className={tab.id === 'analysis' ? `w-10 h-10 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                        activeTab === tab.id 
+                          ? 'bg-primary/10 text-primary' 
+                          : 'text-on-surface-variant hover:bg-surface-variant/50'
+                      }` : `h-10 px-4 rounded-full flex items-center gap-2 whitespace-nowrap transition-colors ${
+                        activeTab === tab.id 
+                          ? 'bg-primary/10 text-primary font-medium' 
+                          : 'text-on-surface-variant hover:bg-surface-variant/50 font-medium'
+                      }`}
+                      title={tab.id === 'analysis' ? tab.label : undefined}
+                    >
+                      <Icon name={tab.icon} className="text-[20px]" filled={activeTab === tab.id} />
+                      {tab.id !== 'analysis' && <span>{tab.label}</span>}
+                    </button>
+                  </li>
+                </React.Fragment>
               ))}
             </ul>
           </nav>
@@ -362,17 +372,17 @@ function App() {
         <section className="hidden md:flex flex-col w-[60%] bg-surface-container-low p-8 overflow-y-auto items-center custom-scrollbar">
           {/* Canvas Toolbar */}
           <div className="w-full max-w-[850px] flex justify-between items-center mb-6 no-print">
-            <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 border border-outline-variant shadow-sm">
-              <span className="w-3 h-3 rounded-full bg-green-500"></span>
-              <span className="font-label-small text-label-small text-on-surface-variant">Auto-saved</span>
+            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 rounded-full border border-surface-variant shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-[#14B8A6]"></span>
+              <span className="text-xs font-medium text-on-surface-variant">Auto-saved</span>
             </div>
             <div className="flex items-center gap-2">
-              <button className="p-2 bg-white rounded-full border border-outline-variant shadow-sm text-on-surface-variant hover:text-primary transition-colors">
-                <Icon name="zoom_in" />
+              <button className="w-10 h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors">
+                <Icon name="zoom_out" className="text-[20px]" />
               </button>
               <span className="font-label-small text-label-small text-on-surface-variant w-12 text-center">100%</span>
-              <button className="p-2 bg-white rounded-full border border-outline-variant shadow-sm text-on-surface-variant hover:text-primary transition-colors">
-                <Icon name="zoom_out" />
+              <button className="w-10 h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors">
+                <Icon name="zoom_in" className="text-[20px]" />
               </button>
             </div>
           </div>
