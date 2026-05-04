@@ -65,6 +65,22 @@ function App() {
   const [activeTab, setActiveTab] = useState<'personal' | 'experience' | 'education' | 'skills' | 'analysis' | 'templates'>('personal');
   const [newSkill, setNewSkill] = useState('');
   const resumeRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+
+  React.useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        nav.scrollLeft += e.deltaY;
+      }
+    };
+
+    nav.addEventListener('wheel', handleWheel, { passive: false });
+    return () => nav.removeEventListener('wheel', handleWheel);
+  }, []);
 
   const analysis = useMemo(() => analyzeCV(data, language), [data, language]);
 
@@ -334,7 +350,10 @@ function App() {
       <main className="flex-1 flex overflow-hidden">
         {/* Left Panel: Editor (40%) */}
         <section className="w-full md:w-[40%] bg-surface flex flex-col border-r border-outline-variant h-full overflow-hidden shrink-0">
-          <nav className="h-16 border-b border-surface-variant flex items-center px-4 gap-2 bg-surface overflow-x-auto no-scrollbar shrink-0">
+          <nav 
+            ref={navRef}
+            className="h-16 border-b border-surface-variant flex items-center px-4 gap-2 bg-surface overflow-x-auto no-scrollbar shrink-0 custom-scrollbar-hide"
+          >
             <ul className="flex items-center gap-2 min-w-max w-full">
               {tabs.map((tab, index) => (
                 <React.Fragment key={tab.id}>
