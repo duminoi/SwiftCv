@@ -11,5 +11,17 @@
       "type": "http",
       "url": "https://mcp.vercel.com"
     }
+  },
+  "agents": {
+    "overrides": {
+      "cli_help": {
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        },
+        "runConfig": {
+          "maxTurns": 10
+        }
+      }
+    }
   }
 }
