@@ -14,7 +14,10 @@ export interface ScoreResult {
 
 const COMMON_KEYWORDS = [
   'react', 'typescript', 'javascript', 'node.js', 'python', 'java', 'aws', 'docker', 
-  'kubernetes', 'sql', 'nosql', 'agile', 'scrum', 'ci/cd', 'git', 'rest api'
+  'kubernetes', 'sql', 'nosql', 'agile', 'scrum', 'ci/cd', 'git', 'rest api',
+  'leadership', 'management', 'strategy', 'operations', 'sales', 'marketing',
+  'design', 'ui/ux', 'product management', 'project management', 'data analysis',
+  'communication', 'problem solving', 'collaboration', 'negotiation', 'finance'
 ];
 
 export const analyzeCV = (data: CVData, lang: 'en' | 'vi'): ScoreResult => {

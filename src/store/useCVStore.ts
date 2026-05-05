@@ -91,7 +91,7 @@ const initialData: CVData = {
       position: 'Chief Operating Officer',
       startDate: '2012-06',
       endDate: '2017-12',
-      bulletPoints: '<ul><li>Architected scalable operational frameworks that supported 500% employee growth.</li><li>Maintained core profitability margins while doubling R&D investment.</li></ul>',
+      bulletPoints: '<ul><li>Architected scalable operational frameworks that supported 500% employee growth.</li><li>Maintained core profitability margins while doubling R&D investment.</li><li>Implemented lean management methodologies, reducing project turnaround time by 15%.</li></ul>',
     }
   ],
   educations: [

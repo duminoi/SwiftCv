@@ -355,7 +355,7 @@ function App() {
             className="h-16 border-b border-surface-variant flex items-center px-4 gap-2 bg-surface overflow-x-auto no-scrollbar shrink-0 custom-scrollbar-hide"
           >
             <ul className="flex items-center gap-2 min-w-max w-full">
-              {tabs.map((tab, index) => (
+              {tabs.map((tab) => (
                 <React.Fragment key={tab.id}>
                   {tab.id === 'analysis' && <div className="flex-1"></div>}
                   <li>
