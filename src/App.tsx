@@ -1,8 +1,8 @@
 import React, { useRef, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCVStore } from './store/useCVStore';
-import { useReactToPrint } from 'react-to-print';
 import { analyzeCV } from './store/cvAnalyzer';
+import html2pdf from 'html2pdf.js';
 import { StandardTemplate } from './components/templates/StandardTemplate';
 import { MinimalistTemplate } from './components/templates/MinimalistTemplate';
 import { PixelsTemplate } from './components/templates/PixelsTemplate';
@@ -64,6 +64,7 @@ function App() {
   
   const [activeTab, setActiveTab] = useState<'personal' | 'experience' | 'education' | 'skills' | 'analysis' | 'templates'>('personal');
   const [newSkill, setNewSkill] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
   const resumeRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLElement>(null);
 
@@ -84,10 +85,53 @@ function App() {
 
   const analysis = useMemo(() => analyzeCV(data, language), [data, language]);
 
-  const handlePrint = useReactToPrint({
-    contentRef: resumeRef,
-    documentTitle: `CV_${data.personalInfo.fullName.replace(/\s+/g, '_')}`,
-  });
+  const handlePrint = async () => {
+    if (!resumeRef.current) return;
+    
+    setIsDownloading(true);
+    
+    // Đợi UI cập nhật trạng thái hiển thị loading overlay (100ms)
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    try {
+      const element = resumeRef.current;
+      const opt = {
+        margin: 0,
+        filename: `CV_${data.personalInfo.fullName.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 1 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true,
+          onclone: (document) => {
+            // Fix cho lỗi html2canvas không hỗ trợ oklch/oklab của Tailwind v4
+            // Bằng cách vô hiệu hóa các hàm màu này trong bản sao DOM trước khi render
+            const styles = document.querySelectorAll('style');
+            for (let i = 0; i < styles.length; i++) {
+              if (styles[i].textContent) {
+                styles[i].textContent = styles[i].textContent?.replace(/oklch|oklab/g, 'invalidcolor');
+              }
+            }
+            const elements = document.querySelectorAll('*');
+            for (let i = 0; i < elements.length; i++) {
+              const styleAttr = elements[i].getAttribute('style');
+              if (styleAttr && (styleAttr.includes('oklch') || styleAttr.includes('oklab'))) {
+                elements[i].setAttribute('style', styleAttr.replace(/oklch|oklab/g, 'invalidcolor'));
+              }
+            }
+          }
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      // Tạo và tải PDF
+      // @ts-ignore
+      await html2pdf().set(opt).from(element).save();
+    } catch (error) {
+      console.error("Lỗi khi tạo PDF:", error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleAddSkill = (e: React.FormEvent) => {
     e.preventDefault();
@@ -338,16 +382,37 @@ function App() {
             {language}
           </button>
           <button 
-            onClick={() => handlePrint()}
-            className="h-10 px-6 rounded-full bg-primary text-on-primary font-medium hover:bg-primary/90 transition-colors shadow-sm"
+            onClick={handlePrint}
+            disabled={isDownloading}
+            className={`h-10 px-6 rounded-full bg-primary text-on-primary font-medium transition-colors shadow-sm flex items-center justify-center gap-2 ${
+              isDownloading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary/90'
+            }`}
           >
-            Download PDF
+            {isDownloading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
+                Downloading...
+              </>
+            ) : (
+              'Download PDF'
+            )}
           </button>
         </div>
       </header>
 
       {/* Main Layout */}
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 flex overflow-hidden relative">
+        {/* Full-screen Loading Overlay */}
+        {isDownloading && (
+          <div className="absolute inset-0 z-50 bg-surface/80 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200">
+            <div className="bg-surface-container p-8 rounded-2xl shadow-xl flex flex-col items-center max-w-sm text-center">
+              <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-6"></div>
+              <h3 className="text-xl font-headline-md text-on-surface mb-2">Generating PDF...</h3>
+              <p className="text-body-md text-on-surface-variant">Please wait a moment while we prepare your high-quality resume. This may take a few seconds.</p>
+            </div>
+          </div>
+        )}
+
         {/* Left Panel: Editor (40%) */}
         <section className="w-full md:w-[40%] bg-surface flex flex-col border-r border-outline-variant h-full overflow-hidden shrink-0">
           <nav 
