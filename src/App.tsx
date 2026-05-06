@@ -93,33 +93,25 @@ function App() {
     // Đợi UI cập nhật trạng thái hiển thị loading overlay (100ms)
     await new Promise(resolve => setTimeout(resolve, 100));
 
+    // Fix lỗi html2canvas không hỗ trợ oklch/oklab của Tailwind v4:
+    // Tạm thời thay thế các màu này bằng 'transparent' trên DOM thật trước khi render PDF.
+    const styles = document.querySelectorAll('style');
+    const originalStyles: string[] = [];
+    styles.forEach(style => {
+      originalStyles.push(style.textContent || '');
+      if (style.textContent) {
+        // Thay thế cả các hàm oklch(), oklab() và các từ khóa 'in oklab', 'in oklch' trong color-mix
+        style.textContent = style.textContent.replace(/oklch|oklab/g, 'rgb');
+      }
+    });
+
     try {
       const element = resumeRef.current;
       const opt = {
         margin: 0,
         filename: `CV_${data.personalInfo.fullName.replace(/\s+/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 1 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true,
-          onclone: (document) => {
-            // Fix cho lỗi html2canvas không hỗ trợ oklch/oklab của Tailwind v4
-            // Bằng cách vô hiệu hóa các hàm màu này trong bản sao DOM trước khi render
-            const styles = document.querySelectorAll('style');
-            for (let i = 0; i < styles.length; i++) {
-              if (styles[i].textContent) {
-                styles[i].textContent = styles[i].textContent?.replace(/oklch|oklab/g, 'invalidcolor');
-              }
-            }
-            const elements = document.querySelectorAll('*');
-            for (let i = 0; i < elements.length; i++) {
-              const styleAttr = elements[i].getAttribute('style');
-              if (styleAttr && (styleAttr.includes('oklch') || styleAttr.includes('oklab'))) {
-                elements[i].setAttribute('style', styleAttr.replace(/oklch|oklab/g, 'invalidcolor'));
-              }
-            }
-          }
-        },
+        html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
@@ -129,6 +121,10 @@ function App() {
     } catch (error) {
       console.error("Lỗi khi tạo PDF:", error);
     } finally {
+      // Khôi phục lại CSS ban đầu
+      styles.forEach((style, index) => {
+        style.textContent = originalStyles[index];
+      });
       setIsDownloading(false);
     }
   };
