@@ -13,11 +13,45 @@ import './i18n';
 
 // --- Sub-components ---
 
-const Icon = ({ name, className = '', filled = false }: { name: string, className?: string, filled?: boolean }) => (
-  <span className={`material-symbols-outlined ${className}`} style={{ fontVariationSettings: filled ? "'FILL' 1" : "'FILL' 0" }}>
+const Icon = ({ name, className = '', filled = false, style }: { name: string, className?: string, filled?: boolean, style?: React.CSSProperties }) => (
+  <span className={`material-symbols-outlined ${className}`} style={{ fontVariationSettings: filled ? "'FILL' 1" : "'FILL' 0", ...style }}>
     {name}
   </span>
 );
+
+const ScoreGauge = ({ value, max = 100, size = 120, thickness = 10, label = '' }: { value: number; max?: number; size?: number; thickness?: number; label?: string }) => {
+  const pct = Math.min(value / max, 1);
+  const color = pct >= 0.7 ? '#14B8A6' : pct >= 0.4 ? '#F59E0B' : '#EF4444';
+  const bgColor = pct >= 0.7 ? '#14B8A620' : pct >= 0.4 ? '#F59E0B20' : '#EF444420';
+  const radius = (size - thickness) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - pct);
+  const [animatedOffset, setAnimatedOffset] = React.useState(circumference);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setAnimatedOffset(offset), 100);
+    return () => clearTimeout(timer);
+  }, [value]);
+
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={bgColor} strokeWidth={thickness} />
+        <circle
+          cx={size / 2} cy={size / 2} r={radius} fill="none"
+          stroke={color} strokeWidth={thickness} strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={animatedOffset}
+          style={{ transition: 'stroke-dashoffset 1s ease-out' }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold leading-none" style={{ color }}>{value}</span>
+        {label && <span className="text-[9px] text-on-surface-variant font-medium mt-0.5">{label}</span>}
+      </div>
+    </div>
+  );
+};
 
 const InputField = ({ label, value, onChange, type = "text", rows }: any) => (
   <div className="relative">
@@ -75,7 +109,6 @@ function App() {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
   const resumeRef = useRef<HTMLDivElement>(null);
-  const navRef = useRef<HTMLElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [aiState, setAiState] = useState<{ loading: boolean; result: any; error: string | null }>({ loading: false, result: null, error: null });
@@ -86,22 +119,16 @@ function App() {
   const [matchResult, setMatchResult] = useState<any>(null);
   const [matchLoading, setMatchLoading] = useState(false);
 
-  React.useEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      if (e.deltaY !== 0) {
-        e.preventDefault();
-        nav.scrollLeft += e.deltaY;
-      }
-    };
-
-    nav.addEventListener('wheel', handleWheel, { passive: false });
-    return () => nav.removeEventListener('wheel', handleWheel);
-  }, []);
-
   const analysis = useMemo(() => analyzeCV(data, language), [data, language]);
+
+  const sectionProgress = useMemo(() => {
+    const pi = data.personalInfo;
+    const personalFilled = [pi.fullName, pi.jobTitle, pi.email, pi.phone].filter(Boolean).length;
+    const expFilled = data.experiences.filter(e => e.company || e.position).length;
+    const eduFilled = data.educations.filter(e => e.school || e.degree).length;
+    const skillCount = data.skills.length;
+    return { personalFilled, expFilled, eduFilled, skillCount, total: personalFilled + expFilled + eduFilled + skillCount };
+  }, [data]);
 
   React.useEffect(() => {
     if (activeTab !== 'analysis' || aiState.loading) return;
@@ -231,15 +258,17 @@ function App() {
     }
   };
 
-  const tabs = [
-    { id: 'personal', label: t('sections.personal'), icon: 'person' },
-    { id: 'templates', label: 'Templates', icon: 'palette' },
-    { id: 'experience', label: t('sections.experience'), icon: 'work' },
-    { id: 'education', label: t('sections.education'), icon: 'school' },
-    { id: 'skills', label: t('sections.skills') || 'Skills', icon: 'psychology' },
-    { id: 'analysis', label: 'AI Analysis', icon: 'insights' },
-    { id: 'match', label: 'Job Match', icon: 'work_search' },
-    { id: 'settings', label: t('sections.settings'), icon: 'settings' },
+  const formTabs = [
+    { id: 'personal', label: t('sections.personal'), icon: 'person', short: 'Info' },
+    { id: 'experience', label: t('sections.experience'), icon: 'work', short: 'Work' },
+    { id: 'education', label: t('sections.education'), icon: 'school', short: 'Edu' },
+    { id: 'skills', label: t('sections.skills') || 'Skills', icon: 'psychology', short: 'Skills' },
+  ];
+  const toolTabs = [
+    { id: 'analysis', label: 'AI Analysis', icon: 'insights', short: 'AI' },
+    { id: 'match', label: 'Job Match', icon: 'search_insights', short: 'Match' },
+    { id: 'templates', label: 'Templates', icon: 'palette', short: 'Theme' },
+    { id: 'settings', label: t('sections.settings'), icon: 'settings', short: 'Setup' },
   ];
 
   const renderTabContent = () => {
@@ -247,11 +276,17 @@ function App() {
       case 'personal':
         return (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div>
-              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.personal')}</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant">Manage your personal and contact details.</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.personal')}</h2>
+                <p className="font-body-md text-body-md text-on-surface-variant">Manage your personal and contact details.</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant bg-surface-variant/60 px-3 py-1.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sectionProgress.personalFilled >= 4 ? '#14B8A6' : '#F59E0B' }}></span>
+                {sectionProgress.personalFilled}/4 filled
+              </div>
             </div>
-            <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-5">
+            <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-5">
               <div className="grid grid-cols-2 gap-5">
                 <InputField label={t('labels.fullName')} value={data.personalInfo.fullName} onChange={(v: any) => updatePersonalInfo({ fullName: v })} />
                 <InputField label={t('labels.jobTitle')} value={data.personalInfo.jobTitle} onChange={(v: any) => updatePersonalInfo({ jobTitle: v })} />
@@ -320,26 +355,40 @@ function App() {
                   placeholder="Write a brief professional summary..."
                 />
                 {rewriteState.id === null && rewriteState.result && (
-                  <div className="mt-3 space-y-2 border border-primary/20 rounded-lg p-3 bg-primary-container/10">
-                    <p className="text-xs font-medium text-primary uppercase tracking-wider">AI Suggestions — click to apply</p>
-                    {(Array.isArray(rewriteState.result) ? rewriteState.result : rewriteState.result.versions || []).map((version: any, i: number) => (
+                  <div className="mt-3 rounded-xl border border-primary/20 bg-primary-container/10 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-primary-container/20 border-b border-primary/10">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Icon name="auto_awesome" className="text-[12px] text-primary" />
+                        </div>
+                        <span className="text-xs font-medium text-primary">AI Suggestions</span>
+                      </div>
                       <button
-                        key={i}
-                        onClick={() => {
-                          updatePersonalInfo({ summary: typeof version === 'string' ? version : Array.isArray(version) ? version.join('\n') : version });
-                          setRewriteState({ id: null, loading: false, result: null });
-                        }}
-                        className="w-full text-left text-sm p-3 rounded border border-outline-variant bg-white hover:border-primary transition-colors"
+                        onClick={() => setRewriteState({ id: null, loading: false, result: null })}
+                        className="text-[10px] text-on-surface-variant hover:text-primary px-2 py-1 rounded hover:bg-surface/50 transition-colors"
                       >
-                        {typeof version === 'string' ? version : Array.isArray(version) ? version.map((b: string) => `• ${b}`).join('\n') : JSON.stringify(version)}
+                        Dismiss
                       </button>
-                    ))}
-                    <button
-                      onClick={() => setRewriteState({ id: null, loading: false, result: null })}
-                      className="text-xs text-on-surface-variant hover:underline"
-                    >
-                      Dismiss
-                    </button>
+                    </div>
+                    <div className="p-3 space-y-2">
+                      {(Array.isArray(rewriteState.result) ? rewriteState.result : rewriteState.result.versions || []).map((version: any, i: number) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            updatePersonalInfo({ summary: typeof version === 'string' ? version : Array.isArray(version) ? version.join('\n') : version });
+                            setRewriteState({ id: null, loading: false, result: null });
+                          }}
+                          className="w-full text-left text-sm p-3 rounded-xl border border-outline-variant bg-white hover:border-primary hover:shadow-sm transition-all group"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="flex-1 leading-relaxed">
+                              {typeof version === 'string' ? version : Array.isArray(version) ? version.map((b: string) => `• ${b}`).join('\n') : JSON.stringify(version)}
+                            </span>
+                            <span className="text-[10px] font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1">Apply</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -349,20 +398,37 @@ function App() {
       case 'experience':
         return (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div>
-              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.experience')}</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant">Detail your work experience.</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.experience')}</h2>
+                <p className="font-body-md text-body-md text-on-surface-variant">Detail your work experience.</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant bg-surface-variant/60 px-3 py-1.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sectionProgress.expFilled > 0 ? '#14B8A6' : '#EF4444' }}></span>
+                {sectionProgress.expFilled} entries
+              </div>
             </div>
             {data.experiences.map((exp) => (
-              <div key={exp.id} className="bg-surface-container-lowest p-6 pt-12 rounded-lg border border-outline-variant shadow-sm relative group">
-                <button
-                  onClick={() => removeExperience(exp.id)}
-                  className="absolute top-2 right-2 text-on-surface-variant hover:text-error transition-colors p-2 rounded-full hover:bg-error-container opacity-0 group-hover:opacity-100 z-10"
-                  title="Remove Experience"
-                >
-                  <Icon name="delete" />
-                </button>
-                <div className="space-y-5">
+              <div key={exp.id} className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden group">
+                <div className="flex items-center justify-between px-5 py-3 bg-surface-container-low/30 border-b border-outline-variant/50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-primary-container/30 flex items-center justify-center text-primary">
+                      <Icon name="work" className="text-[18px]" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-on-surface">{exp.position || 'New Position'}</span>
+                      {exp.company && <span className="text-xs text-on-surface-variant ml-1.5">at {exp.company}</span>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeExperience(exp.id)}
+                    className="text-on-surface-variant hover:text-error transition-all p-1.5 rounded-lg hover:bg-error-container/40 opacity-0 group-hover:opacity-100"
+                    title="Remove Experience"
+                  >
+                    <Icon name="delete" className="text-[18px]" />
+                  </button>
+                </div>
+                <div className="p-5 space-y-5">
                   <div className="grid grid-cols-2 gap-5">
                     <InputField label={t('labels.company')} value={exp.company} onChange={(v: any) => updateExperience(exp.id, { company: v })} />
                     <InputField label={t('labels.position')} value={exp.position} onChange={(v: any) => updateExperience(exp.id, { position: v })} />
@@ -392,57 +458,88 @@ function App() {
                       onChange={(v) => updateExperience(exp.id, { bulletPoints: v })}
                       placeholder="Describe your responsibilities and achievements..."
                     />
-                    {rewriteState.id === exp.id && rewriteState.result && (
-                      <div className="mt-3 space-y-2 border border-primary/20 rounded-lg p-3 bg-primary-container/10">
-                        <p className="text-xs font-medium text-primary uppercase tracking-wider">AI Suggestions — click to apply</p>
-                        {(rewriteState.result.versions || []).map((version: string[], i: number) => (
-                          <button
-                            key={i}
-                            onClick={() => {
-                              const html = `<ul>${version.map((b: string) => `<li>${b}</li>`).join('')}</ul>`;
-                              updateExperience(exp.id, { bulletPoints: html });
-                              setRewriteState({ id: null, loading: false, result: null });
-                            }}
-                            className="w-full text-left text-sm p-3 rounded border border-outline-variant bg-white hover:border-primary transition-colors"
-                          >
-                            {version.map((b: string) => `• ${b}`).join('\n')}
-                          </button>
-                        ))}
-                        <button
-                          onClick={() => setRewriteState({ id: null, loading: false, result: null })}
-                          className="text-xs text-on-surface-variant hover:underline"
-                        >
-                          Dismiss
-                        </button>
+                {rewriteState.id === exp.id && rewriteState.result && (
+                  <div className="mt-3 rounded-xl border border-primary/20 bg-primary-container/10 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-primary-container/20 border-b border-primary/10">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Icon name="auto_awesome" className="text-[12px] text-primary" />
+                        </div>
+                        <span className="text-xs font-medium text-primary">AI Suggestions</span>
                       </div>
-                    )}
+                      <button
+                        onClick={() => setRewriteState({ id: null, loading: false, result: null })}
+                        className="text-[10px] text-on-surface-variant hover:text-primary px-2 py-1 rounded hover:bg-surface/50 transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                    <div className="p-3 space-y-2">
+                      {(rewriteState.result.versions || []).map((version: string[], i: number) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            const html = `<ul>${version.map((b: string) => `<li>${b}</li>`).join('')}</ul>`;
+                            updateExperience(exp.id, { bulletPoints: html });
+                            setRewriteState({ id: null, loading: false, result: null });
+                          }}
+                          className="w-full text-left text-sm p-3 rounded-xl border border-outline-variant bg-white hover:border-primary hover:shadow-sm transition-all group"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="flex-1 leading-relaxed whitespace-pre-line">{version.map((b: string) => `• ${b}`).join('\n')}</span>
+                            <span className="text-[10px] font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1">Apply</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                   </div>
                 </div>
               </div>
             ))}
-            <button onClick={addExperience} className="w-full py-4 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-primary font-title-md text-title-md hover:bg-primary-container/10 transition-colors">
-              <Icon name="add" />
-              {t('common.add') || 'Add Experience'}
+            <button onClick={addExperience} className="w-full py-4 border-2 border-dashed border-outline-variant rounded-xl flex items-center justify-center gap-2.5 text-primary font-medium hover:bg-primary-container/10 hover:border-primary/30 transition-all duration-200 group">
+              <div className="w-8 h-8 rounded-full bg-primary-container/20 flex items-center justify-center group-hover:bg-primary-container/40 transition-colors">
+                <Icon name="add" className="text-[20px] text-primary" />
+              </div>
+              <span>{t('common.add') || 'Add Experience'}</span>
             </button>
           </div>
         );
       case 'education':
         return (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div>
-              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.education')}</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant">Detail your academic background to establish your foundation.</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.education')}</h2>
+                <p className="font-body-md text-body-md text-on-surface-variant">Detail your academic background to establish your foundation.</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant bg-surface-variant/60 px-3 py-1.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sectionProgress.eduFilled > 0 ? '#14B8A6' : '#EF4444' }}></span>
+                {sectionProgress.eduFilled} entries
+              </div>
             </div>
             {data.educations.map((edu) => (
-              <div key={edu.id} className="bg-surface-container-lowest p-6 pt-12 rounded-lg border border-outline-variant shadow-sm relative group">
-                <button
-                  onClick={() => removeEducation(edu.id)}
-                  className="absolute top-2 right-2 text-on-surface-variant hover:text-error transition-colors p-2 rounded-full hover:bg-error-container opacity-0 group-hover:opacity-100 z-10"
-                  title="Remove Education"
-                >
-                  <Icon name="delete" />
-                </button>
-                <div className="space-y-5">
+              <div key={edu.id} className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden group">
+                <div className="flex items-center justify-between px-5 py-3 bg-surface-container-low/30 border-b border-outline-variant/50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-secondary-container/30 flex items-center justify-center text-secondary">
+                      <Icon name="school" className="text-[18px]" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-on-surface">{edu.degree || 'New Degree'}</span>
+                      {edu.school && <span className="text-xs text-on-surface-variant ml-1.5">at {edu.school}</span>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeEducation(edu.id)}
+                    className="text-on-surface-variant hover:text-error transition-all p-1.5 rounded-lg hover:bg-error-container/40 opacity-0 group-hover:opacity-100"
+                    title="Remove Education"
+                  >
+                    <Icon name="delete" className="text-[18px]" />
+                  </button>
+                </div>
+                <div className="p-5 space-y-5">
                   <InputField label={t('labels.school')} value={edu.school} onChange={(v: any) => updateEducation(edu.id, { school: v })} />
                   <InputField label={t('labels.degree')} value={edu.degree} onChange={(v: any) => updateEducation(edu.id, { degree: v })} />
                   <div className="grid grid-cols-2 gap-5">
@@ -452,18 +549,26 @@ function App() {
                 </div>
               </div>
             ))}
-            <button onClick={addEducation} className="w-full py-4 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-primary font-title-md text-title-md hover:bg-primary-container/10 transition-colors">
-              <Icon name="add" />
-              {t('common.add') || 'Add Education'}
+            <button onClick={addEducation} className="w-full py-4 border-2 border-dashed border-outline-variant rounded-xl flex items-center justify-center gap-2.5 text-primary font-medium hover:bg-primary-container/10 hover:border-primary/30 transition-all duration-200 group">
+              <div className="w-8 h-8 rounded-full bg-primary-container/20 flex items-center justify-center group-hover:bg-primary-container/40 transition-colors">
+                <Icon name="add" className="text-[20px] text-primary" />
+              </div>
+              <span>{t('common.add') || 'Add Education'}</span>
             </button>
           </div>
         );
       case 'skills':
         return (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div>
-              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.skills')}</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant">Add skills relevant to your expertise.</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.skills')}</h2>
+                <p className="font-body-md text-body-md text-on-surface-variant">Add skills relevant to your expertise.</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant bg-surface-variant/60 px-3 py-1.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sectionProgress.skillCount > 0 ? '#14B8A6' : '#EF4444' }}></span>
+                {sectionProgress.skillCount} skills
+              </div>
             </div>
             <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-5">
               <form onSubmit={handleAddSkill} className="flex gap-2">
@@ -505,13 +610,19 @@ function App() {
               </div>
               {suggestedSkills.length > 0 && (
                 <div className="border-t border-outline-variant pt-4">
-                  <p className="text-xs font-medium text-primary uppercase tracking-wider mb-3">AI Suggested Skills — click to add</p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Icon name="auto_awesome" className="text-[12px] text-primary" />
+                    </div>
+                    <span className="text-xs font-medium text-primary">AI Suggested Skills</span>
+                    <span className="text-[10px] text-on-surface-variant">— click to add</span>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {suggestedSkills.filter(s => !data.skills.includes(s)).map((skill, i) => (
                       <button
                         key={i}
                         onClick={() => { addSkill(skill); setSuggestedSkills(prev => prev.filter(s => s !== skill)); }}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-primary-container/40 text-primary rounded-full text-sm font-medium hover:bg-primary-container transition-colors border border-primary/20"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-container/30 text-primary rounded-full text-xs font-medium hover:bg-primary-container/60 transition-colors border border-primary/20 hover:border-primary/40"
                       >
                         <Icon name="add" className="text-[14px]" /> {skill}
                       </button>
@@ -519,7 +630,7 @@ function App() {
                   </div>
                   <button
                     onClick={() => setSuggestedSkills([])}
-                    className="text-xs text-on-surface-variant hover:underline mt-2"
+                    className="text-[10px] text-on-surface-variant hover:text-primary mt-2.5 px-2 py-1 rounded hover:bg-surface-variant/50 transition-colors"
                   >
                     Dismiss suggestions
                   </button>
@@ -557,68 +668,83 @@ function App() {
 
             {!aiState.loading && (
               <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-primary-container rounded-full text-on-primary-container">
-                      <Icon name="military_tech" />
-                    </div>
-                    <div>
-                      <h3 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-widest">{t('analysis.score')}</h3>
-                      <div className="text-4xl font-headline-md font-bold text-primary">{aiResult.total}<span className="text-lg text-on-surface-variant">/100</span></div>
-                    </div>
+                <div className="flex items-center gap-6 mb-4">
+                  <ScoreGauge value={aiResult.total} size={110} thickness={8} label="ATS Score" />
+                  <div className="flex-1 space-y-1.5">
+                    {[
+                      { key: t('analysis.breakdown.personal'), score: aiResult.breakdown.personal, max: 15 },
+                      { key: t('analysis.breakdown.summary'), score: aiResult.breakdown.summary, max: 15 },
+                      { key: t('analysis.breakdown.experience'), score: aiResult.breakdown.experience, max: 40 },
+                      { key: t('analysis.breakdown.education'), score: aiResult.breakdown.education, max: 15 },
+                      { key: t('analysis.breakdown.skills'), score: aiResult.breakdown.skills, max: 15 },
+                    ].map((item) => {
+                      const pct = item.score / item.max;
+                      const barColor = pct >= 0.7 ? '#14B8A6' : pct >= 0.4 ? '#F59E0B' : '#EF4444';
+                      return (
+                        <div key={item.key}>
+                          <div className="flex justify-between text-xs mb-0.5">
+                            <span className="text-on-surface font-medium">{item.key}</span>
+                            <span className="text-on-surface-variant">{item.score}/{item.max}</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct * 100}%`, backgroundColor: barColor }}></div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {aiState.result && <span className="text-[10px] text-green-600 font-medium uppercase tracking-wider">AI Powered</span>}
                 </div>
 
-                <div className="space-y-3">
+                {aiState.result && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">AI Powered</span>
+                    <span className="text-[10px] text-on-surface-variant">Real-time analysis</span>
+                  </div>
+                )}
+
+                <div className="border-t border-outline-variant pt-4 grid grid-cols-3 gap-4">
                   {[
-                    { key: t('analysis.breakdown.personal'), score: aiResult.breakdown.personal, max: 15 },
-                    { key: t('analysis.breakdown.summary'), score: aiResult.breakdown.summary, max: 15 },
-                    { key: t('analysis.breakdown.experience'), score: aiResult.breakdown.experience, max: 40 },
-                    { key: t('analysis.breakdown.education'), score: aiResult.breakdown.education, max: 15 },
-                    { key: t('analysis.breakdown.skills'), score: aiResult.breakdown.skills, max: 15 },
-                  ].map((item) => (
-                    <div key={item.key}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-on-surface font-medium">{item.key}</span>
-                        <span className="text-on-surface-variant">{item.score}/{item.max}</span>
+                    { label: 'Contact', score: aiResult.details.contactCompleteness.score, max: aiResult.details.contactCompleteness.max, icon: 'contact_page' },
+                    { label: 'Metrics', score: aiResult.details.quantifiableMetrics.score, max: aiResult.details.quantifiableMetrics.max, icon: 'bar_chart' },
+                    { label: 'Action Verbs', score: aiResult.details.actionVerbs.score, max: aiResult.details.actionVerbs.max, icon: 'flash_on' },
+                  ].map(item => {
+                    const pct = item.score / item.max;
+                    const color = pct >= 0.7 ? '#14B8A6' : pct >= 0.4 ? '#F59E0B' : '#EF4444';
+                    const R = 14;
+                    const circ = 2 * Math.PI * R;
+                    const off = circ * (1 - Math.min(pct, 1));
+                    return (
+                      <div key={item.label} className="flex flex-col items-center gap-1.5 bg-surface-variant/30 rounded-xl p-3">
+                        <div className="relative w-10 h-10 flex items-center justify-center">
+                          <svg width="40" height="40" className="transform -rotate-90">
+                            <circle cx="20" cy="20" r={R} fill="none" stroke="currentColor" strokeWidth="4" className="text-surface-variant" />
+                            <circle cx="20" cy="20" r={R} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
+                              strokeDasharray={circ} strokeDashoffset={off} style={{ transition: 'stroke-dashoffset 0.8s ease-out' }} />
+                          </svg>
+                          <Icon name={item.icon} className="text-[14px] absolute" style={{ color }} />
+                        </div>
+                        <span className="text-[10px] font-bold" style={{ color }}>{item.score}/{item.max}</span>
+                        <span className="text-[9px] text-on-surface-variant uppercase tracking-wider font-medium">{item.label}</span>
                       </div>
-                      <div className="w-full h-2 bg-surface-variant rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${(item.score / item.max) * 100}%`, backgroundColor: item.score / item.max >= 0.7 ? '#14B8A6' : item.score / item.max >= 0.4 ? '#F59E0B' : '#EF4444' }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                <div className="border-t border-outline-variant pt-4 grid grid-cols-3 gap-3 text-center">
-                  <div>
-                    <div className="text-sm font-bold" style={{ color: aiResult.details.contactCompleteness.score >= 7 ? '#14B8A6' : '#F59E0B' }}>{aiResult.details.contactCompleteness.score}/{aiResult.details.contactCompleteness.max}</div>
-                    <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Contact</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold" style={{ color: aiResult.details.quantifiableMetrics.score >= 6 ? '#14B8A6' : '#F59E0B' }}>{aiResult.details.quantifiableMetrics.score}/{aiResult.details.quantifiableMetrics.max}</div>
-                    <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Metrics</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold" style={{ color: aiResult.details.actionVerbs.score >= 6 ? '#14B8A6' : '#F59E0B' }}>{aiResult.details.actionVerbs.score}/{aiResult.details.actionVerbs.max}</div>
-                    <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Action Verbs</div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <h4 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-wider">{t('labels.topSuggestions')}</h4>
                   {aiResult.suggestions.map((suggestion: string, idx: number) => (
-                    <div key={idx} className="flex items-start gap-3 bg-error-container/20 p-3 rounded border border-error-container text-on-surface text-sm">
-                      <Icon name="error" className="text-error mt-0.5 shrink-0" />
-                      <span>{suggestion}</span>
+                    <div key={idx} className="flex items-start gap-3 bg-error-container/15 p-3.5 rounded-xl border border-error-container/30 text-sm text-on-surface">
+                      <div className="w-6 h-6 rounded-full bg-error-container/30 flex items-center justify-center shrink-0 mt-0.5">
+                        <Icon name="priority_high" className="text-[14px] text-error" />
+                      </div>
+                      <span className="leading-relaxed">{suggestion}</span>
                     </div>
                   ))}
                   {aiResult.suggestions.length === 0 && (
-                    <div className="flex items-center gap-3 text-sm text-green-600 bg-green-50 p-3 rounded">
-                      <Icon name="check_circle" />
+                    <div className="flex items-center gap-3 text-sm text-green-700 bg-green-50 p-3.5 rounded-xl border border-green-200/60">
+                      <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                        <Icon name="check_circle" className="text-[16px] text-green-600" />
+                      </div>
                       <span className="font-bold">{t('analysis.perfect')}!</span>
                     </div>
                   )}
@@ -656,53 +782,51 @@ function App() {
             </div>
 
             {matchResult && (
-              <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 rounded-full bg-primary-container text-on-primary-container">
-                      <Icon name="fact_check" />
-                    </div>
-                    <div>
-                      <h3 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-widest">Match Score</h3>
-                      <div className="text-4xl font-headline-md font-bold" style={{ color: matchResult.matchScore >= 70 ? '#14B8A6' : matchResult.matchScore >= 45 ? '#F59E0B' : '#EF4444' }}>
-                        {matchResult.matchScore}<span className="text-lg text-on-surface-variant">%</span>
-                      </div>
-                    </div>
+              <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-6">
+                <div className="flex items-center gap-6">
+                  <ScoreGauge value={matchResult.matchScore} max={100} size={100} thickness={7} label="% Match" />
+                  <div className="flex-1 space-y-1.5">
+                    {[
+                      { key: 'Keywords', score: matchResult.breakdown.keywords },
+                      { key: 'Skills', score: matchResult.breakdown.skills },
+                      { key: 'Experience', score: matchResult.breakdown.experience },
+                      { key: 'Education', score: matchResult.breakdown.education },
+                    ].map(item => {
+                      const barColor = item.score >= 70 ? '#14B8A6' : item.score >= 45 ? '#F59E0B' : '#EF4444';
+                      return (
+                        <div key={item.key}>
+                          <div className="flex justify-between text-xs mb-0.5">
+                            <span className="text-on-surface font-medium">{item.key}</span>
+                            <span className="text-on-surface-variant">{item.score}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${item.score}%`, backgroundColor: barColor }}></div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  {[
-                    { key: 'Keywords', score: matchResult.breakdown.keywords },
-                    { key: 'Skills', score: matchResult.breakdown.skills },
-                    { key: 'Experience', score: matchResult.breakdown.experience },
-                    { key: 'Education', score: matchResult.breakdown.education },
-                  ].map(item => (
-                    <div key={item.key}>
-                      <div className="flex justify-between text-sm mb-0.5">
-                        <span className="text-on-surface font-medium">{item.key}</span>
-                        <span className="text-on-surface-variant">{item.score}%</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${item.score}%`, backgroundColor: item.score >= 70 ? '#14B8A6' : item.score >= 45 ? '#F59E0B' : '#EF4444' }}></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="border-t border-outline-variant pt-4">
-                  <p className="text-sm text-on-surface-variant mb-3">{matchResult.experienceGap}</p>
-                </div>
+                {matchResult.experienceGap && (
+                  <div className="bg-tertiary-container/10 border border-tertiary-container/30 rounded-lg p-3.5">
+                    <p className="text-sm text-on-surface">{matchResult.experienceGap}</p>
+                  </div>
+                )}
 
                 {matchResult.missingKeywords.length > 0 && (
                   <div className="border-t border-outline-variant pt-4">
-                    <h4 className="font-label-small text-label-small text-error uppercase tracking-wider mb-3">Missing Keywords — click to add</h4>
+                    <div className="flex items-center gap-2 mb-3">
+                      <h4 className="font-label-small text-label-small text-error uppercase tracking-wider">Missing Keywords</h4>
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-error-container/40 text-error">{matchResult.missingKeywords.length}</span>
+                      <span className="text-[10px] text-on-surface-variant ml-auto">Click to add to your CV</span>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       {matchResult.missingKeywords.map((kw: string, i: number) => (
                         <button
                           key={i}
                           onClick={() => { addSkill(kw); }}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-error-container/40 text-error rounded-full text-sm font-medium hover:bg-error-container transition-colors border border-error/20"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-error-container/30 text-error rounded-full text-xs font-medium hover:bg-error-container/60 transition-colors border border-error/20 hover:border-error/40"
                         >
                           <Icon name="add" className="text-[14px]" /> {kw}
                         </button>
@@ -713,55 +837,157 @@ function App() {
 
                 {matchResult.matchingKeywords.length > 0 && (
                   <div className="border-t border-outline-variant pt-4">
-                    <h4 className="font-label-small text-label-small text-green-600 uppercase tracking-wider mb-3">Matching Keywords</h4>
+                    <div className="flex items-center gap-2 mb-3">
+                      <h4 className="font-label-small text-label-small text-green-600 uppercase tracking-wider">Matching Keywords</h4>
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-50 text-green-700">{matchResult.matchingKeywords.length}</span>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       {matchResult.matchingKeywords.map((kw: string, i: number) => (
-                        <span key={i} className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-sm font-medium border border-green-200">
-                          <Icon name="check" className="text-[14px]" /> {kw}
+                        <span key={i} className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-medium border border-green-200/60">
+                          <Icon name="check" className="text-[14px] shrink-0" /> {kw}
                         </span>
                       ))}
                     </div>
                   </div>
                 )}
 
-                <div className="border-t border-outline-variant pt-4 space-y-2">
-                  <h4 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-wider">Suggestions</h4>
-                  {matchResult.suggestions.map((s: string, i: number) => (
-                    <div key={i} className="flex items-start gap-3 bg-primary-container/20 p-3 rounded border border-primary-container text-sm text-on-surface">
-                      <Icon name="lightbulb" className="text-primary mt-0.5 shrink-0" />
-                      <span>{s}</span>
-                    </div>
-                  ))}
-                </div>
+                {matchResult.suggestions && matchResult.suggestions.length > 0 && (
+                  <div className="border-t border-outline-variant pt-4 space-y-2.5">
+                    <h4 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-wider">Suggestions</h4>
+                    {matchResult.suggestions.map((s: string, i: number) => (
+                      <div key={i} className="flex items-start gap-3 bg-primary-container/15 p-3.5 rounded-xl border border-primary-container/30 text-sm text-on-surface">
+                        <div className="w-6 h-6 rounded-full bg-primary-container/40 flex items-center justify-center shrink-0 mt-0.5">
+                          <Icon name="lightbulb" className="text-[14px] text-primary" />
+                        </div>
+                        <span className="leading-relaxed">{s}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
         );
 
       case 'templates':
+        const templates = [
+          {
+            id: 'standard', name: 'The International Standard',
+            tags: ['ATS', 'Corporate'],
+            colors: ['#0061a4', '#d1e4ff', '#ffffff'],
+            layout: '2-col'
+          },
+          {
+            id: 'executive', name: 'The Minimalist CEO',
+            tags: ['Executive', 'Serif'],
+            colors: ['#1e293b', '#f8f9ff', '#ffffff'],
+            layout: 'centered'
+          },
+          {
+            id: 'tech', name: 'The Pixels Code',
+            tags: ['Modern', 'Dark'],
+            colors: ['#0f172a', '#1e293b', '#ffffff'],
+            layout: 'sidebar'
+          },
+          {
+            id: 'creative', name: 'The Creative Portfolio',
+            tags: ['Creative', 'Bold'],
+            colors: ['#6b5778', '#f3daff', '#ffffff'],
+            layout: 'asymmetric'
+          }
+        ];
         return (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div>
-              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">Templates</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant">Choose a design for your CV.</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-headline-md text-headline-md text-on-surface mb-2">Templates</h2>
+                <p className="font-body-md text-body-md text-on-surface-variant">Choose a design for your CV.</p>
+              </div>
+              <div className="text-xs text-on-surface-variant bg-surface-variant/50 px-3 py-1.5 rounded-full font-medium">
+                {currentTemplate === 'standard' ? 'Standard' : currentTemplate === 'executive' ? 'Executive' : currentTemplate === 'tech' ? 'Tech' : 'Creative'} selected
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { id: 'standard', name: 'The International Standard' },
-                { id: 'executive', name: 'The Minimalist CEO' },
-                { id: 'tech', name: 'The Pixels Code' },
-                { id: 'creative', name: 'The Creative Portfolio' }
-              ].map(t => (
+            <div className="grid grid-cols-2 gap-5">
+              {templates.map(t => (
                 <button
                   key={t.id}
                   onClick={() => setTemplate(t.id as any)}
-                  className={`p-4 rounded-xl border text-left transition-all ${
+                  className={`group relative rounded-2xl overflow-hidden transition-all duration-300 text-left ${
                     currentTemplate === t.id 
-                      ? 'border-primary bg-primary-container/20 ring-2 ring-primary/20' 
-                      : 'border-outline-variant hover:border-primary/50'
+                      ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface shadow-lg shadow-primary/10' 
+                      : 'border border-outline-variant hover:border-primary/50 hover:shadow-md'
                   }`}
                 >
-                  <div className="font-title-md text-title-md text-on-surface font-bold">{t.name}</div>
+                  {/* Mini preview */}
+                  <div className="h-28 bg-white p-3 flex items-start gap-1.5 relative overflow-hidden">
+                    {/* Layout representation */}
+                    {t.layout === '2-col' && (
+                      <>
+                        <div className="w-1/3 h-full rounded bg-[#d1e4ff]/40 flex flex-col gap-1 p-1.5">
+                          <div className="h-1.5 rounded-full bg-[#0061a4]/20 w-3/4"></div>
+                          <div className="h-1 rounded-full bg-[#0061a4]/10 w-1/2"></div>
+                          <div className="h-1 rounded-full bg-[#0061a4]/10 w-2/3"></div>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-1 p-1.5">
+                          <div className="h-2 rounded bg-gray-200 w-1/2"></div>
+                          <div className="h-1 rounded bg-gray-100 w-full"></div>
+                          <div className="h-1 rounded bg-gray-100 w-full"></div>
+                          <div className="h-1 rounded bg-gray-100 w-3/4"></div>
+                        </div>
+                      </>
+                    )}
+                    {t.layout === 'centered' && (
+                      <div className="w-full flex flex-col items-center gap-1.5 p-2">
+                        <div className="h-2 rounded bg-gray-300 w-1/3"></div>
+                        <div className="h-1 rounded bg-gray-200 w-1/4"></div>
+                        <div className="w-full h-px bg-gray-200 my-1"></div>
+                        <div className="h-1 rounded bg-gray-100 w-full"></div>
+                        <div className="h-1 rounded bg-gray-100 w-full"></div>
+                        <div className="h-1 rounded bg-gray-100 w-2/3"></div>
+                      </div>
+                    )}
+                    {t.layout === 'sidebar' && (
+                      <>
+                        <div className="w-[30%] h-full rounded bg-[#0f172a] flex flex-col gap-1 p-1.5">
+                          <div className="h-1.5 rounded bg-white/20 w-3/4"></div>
+                          <div className="h-1 rounded bg-white/10 w-full"></div>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-1 p-1.5">
+                          <div className="h-2 rounded bg-gray-200 w-1/2"></div>
+                          <div className="h-1 rounded bg-gray-100 w-full"></div>
+                          <div className="h-1 rounded bg-gray-100 w-full"></div>
+                        </div>
+                      </>
+                    )}
+                    {t.layout === 'asymmetric' && (
+                      <div className="w-full flex gap-1.5 p-1.5">
+                        <div className="flex-1 flex flex-col gap-1">
+                          <div className="h-2 rounded bg-gray-300 w-3/4"></div>
+                          <div className="h-1 rounded bg-gray-100 w-full"></div>
+                          <div className="h-1 rounded bg-gray-100 w-full"></div>
+                        </div>
+                        <div className="w-1/4 h-full rounded bg-[#6b5778]/20 flex flex-col gap-1 p-1">
+                          <div className="h-1 rounded bg-[#6b5778]/10 w-full"></div>
+                          <div className="h-1 rounded bg-[#6b5778]/10 w-full"></div>
+                        </div>
+                      </div>
+                    )}
+                    {/* Selected checkmark */}
+                    {currentTemplate === t.id && (
+                      <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-sm">
+                        <Icon name="check" className="text-[12px] text-on-primary" />
+                      </div>
+                    )}
+                  </div>
+                  {/* Info */}
+                  <div className="p-3 bg-surface">
+                    <div className="font-title-md text-title-md text-on-surface font-bold group-hover:text-primary transition-colors">{t.name}</div>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      {t.tags.map(tag => (
+                        <span key={tag} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant uppercase tracking-wider">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>
@@ -808,16 +1034,20 @@ function App() {
               <div>
                 <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">{t('labels.dataManagement')}</h3>
                 <p className="text-sm text-on-surface-variant mb-4">{t('labels.tip')}</p>
-                <button
-                  onClick={() => {
-                    if (window.confirm(t('common.confirmReset'))) {
-                      resetData();
-                    }
-                  }}
-                  className="px-6 py-3 rounded-lg border border-error text-error font-medium hover:bg-error-container/20 transition-colors"
-                >
-                  {t('common.reset')}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (window.confirm(t('common.confirmReset'))) {
+                        resetData();
+                      }
+                    }}
+                    className="px-5 py-2.5 rounded-xl border border-error text-error text-sm font-medium hover:bg-error-container/20 transition-colors flex items-center gap-2"
+                  >
+                    <Icon name="delete_forever" className="text-[18px]" />
+                    {t('common.reset')}
+                  </button>
+                  <span className="text-[10px] text-on-surface-variant">This action cannot be undone</span>
+                </div>
               </div>
             </div>
           </div>
@@ -908,40 +1138,44 @@ function App() {
         )}
 
         {/* Left Panel: Editor (40%) */}
-        <section className="w-full md:w-[40%] bg-surface flex flex-col border-r border-outline-variant h-full overflow-hidden shrink-0">
-          <nav 
-            ref={navRef}
-            className="h-16 border-b border-surface-variant flex items-center px-4 gap-2 bg-surface overflow-x-auto no-scrollbar shrink-0 custom-scrollbar-hide"
-          >
-            <ul className="flex items-center gap-2 min-w-max w-full">
-              {tabs.map((tab) => (
-                <React.Fragment key={tab.id}>
-                  {tab.id === 'analysis' && <div className="flex-1"></div>}
-                  <li>
-                    <button
-                      onClick={() => setActiveTab(tab.id as any)}
-                      className={tab.id === 'analysis' ? `w-10 h-10 rounded-full flex items-center justify-center transition-colors shrink-0 ${
-                        activeTab === tab.id 
-                          ? 'bg-primary/10 text-primary' 
-                          : 'text-on-surface-variant hover:bg-surface-variant/50'
-                      }` : `h-10 px-4 rounded-full flex items-center gap-2 whitespace-nowrap transition-colors ${
-                        activeTab === tab.id 
-                          ? 'bg-primary/10 text-primary font-medium' 
-                          : 'text-on-surface-variant hover:bg-surface-variant/50 font-medium'
-                      }`}
-                      title={tab.id === 'analysis' ? tab.label : undefined}
-                    >
-                      <Icon name={tab.icon} className="text-[20px]" filled={activeTab === tab.id} />
-                      {tab.id !== 'analysis' && <span>{tab.label}</span>}
-                    </button>
-                  </li>
-                </React.Fragment>
-              ))}
-            </ul>
+        <section className="w-full md:w-[40%] bg-surface flex border-r border-outline-variant h-full overflow-hidden shrink-0">
+          {/* Vertical Sidebar */}
+          <nav className="w-16 lg:w-20 shrink-0 bg-surface-container-low border-r border-outline-variant flex flex-col items-center py-3 gap-0.5 overflow-y-auto no-scrollbar">
+            {formTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`w-12 lg:w-16 py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
+                  activeTab === tab.id 
+                    ? 'bg-primary-container/30 text-primary font-medium' 
+                    : 'text-on-surface-variant hover:bg-surface-variant/60 hover:text-on-surface'
+                }`}
+                title={tab.label}
+              >
+                <Icon name={tab.icon} className="text-[20px] lg:text-[22px]" filled={activeTab === tab.id} />
+                <span className="text-[9px] lg:text-[10px] font-medium leading-tight">{tab.short}</span>
+              </button>
+            ))}
+            <div className="w-8 h-px bg-outline-variant/50 my-1.5"></div>
+            {toolTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`w-12 lg:w-16 py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
+                  activeTab === tab.id 
+                    ? 'bg-primary-container/30 text-primary font-medium' 
+                    : 'text-on-surface-variant hover:bg-surface-variant/60 hover:text-on-surface'
+                }`}
+                title={tab.label}
+              >
+                <Icon name={tab.icon} className="text-[20px] lg:text-[22px]" filled={activeTab === tab.id} />
+                <span className="text-[9px] lg:text-[10px] font-medium leading-tight">{tab.short}</span>
+              </button>
+            ))}
           </nav>
           
           {/* Editor Content Area */}
-          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-6 lg:p-8 custom-scrollbar">
             {renderTabContent()}
           </div>
         </section>

@@ -15,6 +15,7 @@ $ARGUMENTS
 3. **Checkpoint after each milestone** - Log progress, verify, continue
 4. **Stop only when done** - Reach the verifiable end state or report blocker
 5. **No hallucinated completions** - Every checkpoint must have real evidence
+6. **Status COMPLETE = Tiếng Việt** - Khi Status chuyển sang COMPLETE, TOÀN BỘ output (progress report, stopping condition check, final report) PHẢI viết bằng tiếng Việt để user đọc. Các section khác giữ nguyên tiếng Anh.
 
 ---
 
@@ -83,6 +84,33 @@ Create `.opencode/goal-state.md`:
 - Plan created: ✅
 
 ## Progress Log
+[Auto-updated after each checkpoint]
+```
+
+**Khi Status chuyển từ ACTIVE/IN PROGRESS sang COMPLETE:** Cập nhật toàn bộ nội dung trong goal-state.md sang tiếng Việt, giữ nguyên dữ liệu thực tế. Ví dụ:
+```markdown
+# Mục Tiêu: [Objective]
+
+## Trạng Thái: ✅ HOÀN THÀNH
+## Bắt đầu: [timestamp]
+## Hoàn thành: [timestamp]
+
+## Điều Kiện Hoàn Thành
+[Exact description of "done"]
+
+## Ràng Buộc
+- [What NOT to change]
+
+## Lệnh Xác Thực
+[Command to verify progress]
+
+## Các Checkpoint
+### Checkpoint 0: Khởi tạo
+- Đã parse goal: ✅
+- Đã scan files: ✅
+- Đã tạo plan: ✅
+
+## Nhật Ký Tiến Độ
 [Auto-updated after each checkpoint]
 ```
 
@@ -155,6 +183,9 @@ After EACH meaningful change:
 
 After every 3 checkpoints OR when significant progress made:
 
+- **Nếu Status là COMPLETE:** Toàn bộ output phải viết bằng tiếng Việt (dùng template bên dưới).
+- **Nếu không:** Giữ nguyên tiếng Anh.
+
 ```markdown
 ## 📊 Progress Report
 
@@ -177,51 +208,76 @@ After every 3 checkpoints OR when significant progress made:
 - [What is blocking and why]
 ```
 
+Khi COMPLETE, dùng template Việt:
+```markdown
+## 📊 Báo Cáo Tiến Độ
+
+**Mục tiêu:** [objective]
+**Trạng thái:** ✅ HOÀN THÀNH
+**Số checkpoint đã xong:** N/M
+**Bước hiện tại:** [description]
+**Số file đã thay đổi:** [count]
+**Tests đang pass:** [status]
+
+### Thay đổi gần đây:
+- [Checkpoint N-2]: [what was done]
+- [Checkpoint N-1]: [what was done]
+- [Checkpoint N]: [what was done]
+
+### Công việc tiếp theo (nếu còn):
+- [What will be done next]
+
+### Vướng mắc (nếu có):
+- [What is blocking and why]
+```
+
 ---
 
 ## Phase 3: Stopping Condition Verification
 
 ### 3.1 Check Completion
 
-When all planned steps are done, verify the stopping condition:
+When all planned steps are done, verify the stopping condition.
+
+**QUAN TRỌNG:** Toàn bộ section này và Final Report bên dưới PHẢI viết bằng tiếng Việt (vì status đã là COMPLETE).
 
 ```markdown
-## ✅ Stopping Condition Check
+## ✅ Kiểm Tra Điều Kiện Hoàn Thành
 
-**Condition:** [original stopping condition]
+**Điều kiện:** [original stopping condition]
 
-### Evidence:
+### Bằng chứng:
 1. [Test results - paste actual output]
 2. [Build results - paste actual output]
-3. [Manual verification if applicable]
+3. [Xác minh thủ công nếu cần]
 
-### Verdict: MET | NOT MET
+### Kết luận: ĐẠT | CHƯA ĐẠT
 
-If NOT MET:
-- What's missing: [specific gap]
-- Remaining steps: [what to do]
+Nếu CHƯA ĐẠT:
+- Thiếu gì: [specific gap]
+- Cần làm tiếp: [what to do]
 ```
 
-### 3.2 Final Report
+### 3.2 Final Report (bằng tiếng Việt)
 
 ```markdown
-## 🎯 Goal Complete
+## 🎯 Mục Tiêu Đã Hoàn Thành
 
-**Objective:** [what was achieved]
-**Duration:** [start to end time]
-**Checkpoints:** [total count]
+**Mục tiêu:** [what was achieved]
+**Thời gian:** [start to end time]
+**Số checkpoint:** [total count]
 
-### Summary
+### Tóm tắt
 [What was done, key decisions made]
 
-### Files Changed
+### Các file đã thay đổi
 - [file 1]: [what changed]
 - [file 2]: [what changed]
 
-### Verification
-- [x] Stopping condition met
-- [x] All tests passing
-- [x] No regressions introduced
+### Xác minh
+- [x] Điều kiện hoàn thành đã đạt
+- [x] Tất cả tests đều pass
+- [x] Không có regression nào
 
 ### Artifacts
 - [Any created files, configs, etc.]

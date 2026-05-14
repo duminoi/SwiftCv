@@ -20,6 +20,7 @@
     "@tiptap/react": "^3.22.5",
     "@tiptap/starter-kit": "^3.22.5",
     "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
     "html2pdf.js": "^0.14.0",
     "i18next": "^26.0.8",
     "react": "^19.2.5",
