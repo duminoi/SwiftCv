@@ -8,6 +8,7 @@ import { MinimalistTemplate } from './components/templates/MinimalistTemplate';
 import { PixelsTemplate } from './components/templates/PixelsTemplate';
 import { CreativeTemplate } from './components/templates/CreativeTemplate';
 import { RichTextEditor } from './components/RichTextEditor';
+import { analyzeCV as apiAnalyze, rewriteSummary, rewriteBullets, suggestSkills, matchJD } from './services/api';
 import './i18n';
 
 // --- Sub-components ---
@@ -59,14 +60,31 @@ function App() {
     language, 
     setLanguage,
     currentTemplate,
-    setTemplate
+    setTemplate,
+    primaryColor,
+    setPrimaryColor,
+    fontFamily,
+    setFontFamily,
+    resetData,
+    importData,
   } = useCVStore();
   
-  const [activeTab, setActiveTab] = useState<'personal' | 'experience' | 'education' | 'skills' | 'analysis' | 'templates'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'experience' | 'education' | 'skills' | 'analysis' | 'templates' | 'settings' | 'match'>('personal');
   const [newSkill, setNewSkill] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [showPreview, setShowPreview] = useState(false);
   const resumeRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [aiState, setAiState] = useState<{ loading: boolean; result: any; error: string | null }>({ loading: false, result: null, error: null });
+  const [rewriteState, setRewriteState] = useState<{ id: string | null; loading: boolean; result: any }>({ id: null, loading: false, result: null });
+  const [suggestedSkills, setSuggestedSkills] = useState<string[]>([]);
+  const [suggestSkillsLoading, setSuggestSkillsLoading] = useState(false);
+  const [jdText, setJdText] = useState('');
+  const [matchResult, setMatchResult] = useState<any>(null);
+  const [matchLoading, setMatchLoading] = useState(false);
 
   React.useEffect(() => {
     const nav = navRef.current;
@@ -84,6 +102,82 @@ function App() {
   }, []);
 
   const analysis = useMemo(() => analyzeCV(data, language), [data, language]);
+
+  React.useEffect(() => {
+    if (activeTab !== 'analysis' || aiState.loading) return;
+    if (aiState.result) return;
+    setAiState(prev => ({ ...prev, loading: true, error: null }));
+    apiAnalyze(data, language)
+      .then(result => setAiState({ loading: false, result, error: null }))
+      .catch(err => {
+        setAiState({ loading: false, result: null, error: err.message });
+      });
+  }, [activeTab, data, language]);
+
+  const handleRewrite = async (type: 'summary' | 'bullets', content: string, id: string | null, jobTitle?: string) => {
+    setRewriteState({ id, loading: true, result: null });
+    try {
+      const result = type === 'summary'
+        ? await rewriteSummary(content, jobTitle || '', language)
+        : await rewriteBullets(content, language);
+      setRewriteState({ id, loading: false, result });
+    } catch (err: any) {
+      setRewriteState({ id, loading: false, result: null });
+    }
+  };
+
+  const handleSuggestSkills = async () => {
+    setSuggestSkillsLoading(true);
+    try {
+      const skills = await suggestSkills(data.experiences, data.personalInfo.summary, data.skills, language);
+      setSuggestedSkills(Array.isArray(skills) ? skills : []);
+    } catch {
+      setSuggestedSkills([]);
+    } finally {
+      setSuggestSkillsLoading(false);
+    }
+  };
+
+  const handleMatch = async () => {
+    if (!jdText.trim()) return;
+    setMatchLoading(true);
+    setMatchResult(null);
+    try {
+      const result = await matchJD(data, jdText, language);
+      setMatchResult(result);
+    } catch {
+      setMatchResult(null);
+    } finally {
+      setMatchLoading(false);
+    }
+  };
+
+  const handleExportJSON = () => {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CV_${data.personalInfo.fullName.replace(/\s+/g, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        importData(parsed);
+      } catch {
+        // invalid JSON file
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   const handlePrint = async () => {
     if (!resumeRef.current) return;
@@ -144,6 +238,8 @@ function App() {
     { id: 'education', label: t('sections.education'), icon: 'school' },
     { id: 'skills', label: t('sections.skills') || 'Skills', icon: 'psychology' },
     { id: 'analysis', label: 'AI Analysis', icon: 'insights' },
+    { id: 'match', label: 'Job Match', icon: 'work_search' },
+    { id: 'settings', label: t('sections.settings'), icon: 'settings' },
   ];
 
   const renderTabContent = () => {
@@ -160,6 +256,38 @@ function App() {
                 <InputField label={t('labels.fullName')} value={data.personalInfo.fullName} onChange={(v: any) => updatePersonalInfo({ fullName: v })} />
                 <InputField label={t('labels.jobTitle')} value={data.personalInfo.jobTitle} onChange={(v: any) => updatePersonalInfo({ jobTitle: v })} />
               </div>
+              <div className="flex items-center gap-4">
+                {data.personalInfo.photo && (
+                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-outline-variant shrink-0">
+                    <img src={data.personalInfo.photo} alt="Photo" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <label className="flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant cursor-pointer hover:bg-surface-variant/30 transition-colors text-sm text-primary font-medium">
+                  <Icon name="add_a_photo" className="text-[18px]" />
+                  {data.personalInfo.photo ? t('common.uploadPhoto') : 'Add Photo'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || file.size > 2 * 1024 * 1024) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => updatePersonalInfo({ photo: ev.target?.result as string });
+                      reader.readAsDataURL(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                {data.personalInfo.photo && (
+                  <button
+                    onClick={() => updatePersonalInfo({ photo: undefined })}
+                    className="text-sm text-error hover:underline"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-5">
                 <InputField label={t('labels.email')} value={data.personalInfo.email} onChange={(v: any) => updatePersonalInfo({ email: v })} />
                 <InputField label={t('labels.phone')} value={data.personalInfo.phone} onChange={(v: any) => updatePersonalInfo({ phone: v })} />
@@ -168,13 +296,53 @@ function App() {
               <div className="grid grid-cols-2 gap-5">
                 <InputField label="LinkedIn" value={data.personalInfo.linkedin} onChange={(v: any) => updatePersonalInfo({ linkedin: v })} />
                 <InputField label="GitHub" value={data.personalInfo.github} onChange={(v: any) => updatePersonalInfo({ github: v })} />
+                <InputField label="Portfolio" value={data.personalInfo.portfolio} onChange={(v: any) => updatePersonalInfo({ portfolio: v })} />
               </div>
-              <RichTextEditor 
-                label={t('sections.summary')} 
-                content={data.personalInfo.summary} 
-                onChange={(v) => updatePersonalInfo({ summary: v })} 
-                placeholder="Write a brief professional summary..."
-              />
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-label-small text-label-small text-primary">{t('sections.summary')}</label>
+                  <button
+                    onClick={() => handleRewrite('summary', data.personalInfo.summary, null, data.personalInfo.jobTitle)}
+                    disabled={rewriteState.id === null && rewriteState.loading}
+                    className="flex items-center gap-1 text-xs text-primary font-medium hover:underline"
+                  >
+                    {rewriteState.id === null && rewriteState.loading ? (
+                      <><div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div> Rewriting...</>
+                    ) : (
+                      <><Icon name="auto_awesome" className="text-[14px]" /> AI Rewrite</>
+                    )}
+                  </button>
+                </div>
+                <RichTextEditor
+                  label=""
+                  content={data.personalInfo.summary}
+                  onChange={(v) => updatePersonalInfo({ summary: v })}
+                  placeholder="Write a brief professional summary..."
+                />
+                {rewriteState.id === null && rewriteState.result && (
+                  <div className="mt-3 space-y-2 border border-primary/20 rounded-lg p-3 bg-primary-container/10">
+                    <p className="text-xs font-medium text-primary uppercase tracking-wider">AI Suggestions — click to apply</p>
+                    {(Array.isArray(rewriteState.result) ? rewriteState.result : rewriteState.result.versions || []).map((version: any, i: number) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          updatePersonalInfo({ summary: typeof version === 'string' ? version : Array.isArray(version) ? version.join('\n') : version });
+                          setRewriteState({ id: null, loading: false, result: null });
+                        }}
+                        className="w-full text-left text-sm p-3 rounded border border-outline-variant bg-white hover:border-primary transition-colors"
+                      >
+                        {typeof version === 'string' ? version : Array.isArray(version) ? version.map((b: string) => `• ${b}`).join('\n') : JSON.stringify(version)}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setRewriteState({ id: null, loading: false, result: null })}
+                      className="text-xs text-on-surface-variant hover:underline"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -203,12 +371,52 @@ function App() {
                     <InputField label={t('labels.startDate')} value={exp.startDate} onChange={(v: any) => updateExperience(exp.id, { startDate: v })} />
                     <InputField label={t('labels.endDate')} value={exp.endDate} onChange={(v: any) => updateExperience(exp.id, { endDate: v })} />
                   </div>
-                  <RichTextEditor 
-                    label={t('labels.description')} 
-                    content={exp.bulletPoints} 
-                    onChange={(v) => updateExperience(exp.id, { bulletPoints: v })} 
-                    placeholder="Describe your responsibilities and achievements..."
-                  />
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-label-small text-label-small text-primary">{t('labels.description')}</label>
+                      <button
+                        onClick={() => handleRewrite('bullets', exp.bulletPoints, exp.id)}
+                        disabled={rewriteState.id === exp.id && rewriteState.loading}
+                        className="flex items-center gap-1 text-xs text-primary font-medium hover:underline"
+                      >
+                        {rewriteState.id === exp.id && rewriteState.loading ? (
+                          <><div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div> Rewriting...</>
+                        ) : (
+                          <><Icon name="auto_awesome" className="text-[14px]" /> AI Rewrite</>
+                        )}
+                      </button>
+                    </div>
+                    <RichTextEditor
+                      label=""
+                      content={exp.bulletPoints}
+                      onChange={(v) => updateExperience(exp.id, { bulletPoints: v })}
+                      placeholder="Describe your responsibilities and achievements..."
+                    />
+                    {rewriteState.id === exp.id && rewriteState.result && (
+                      <div className="mt-3 space-y-2 border border-primary/20 rounded-lg p-3 bg-primary-container/10">
+                        <p className="text-xs font-medium text-primary uppercase tracking-wider">AI Suggestions — click to apply</p>
+                        {(rewriteState.result.versions || []).map((version: string[], i: number) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              const html = `<ul>${version.map((b: string) => `<li>${b}</li>`).join('')}</ul>`;
+                              updateExperience(exp.id, { bulletPoints: html });
+                              setRewriteState({ id: null, loading: false, result: null });
+                            }}
+                            className="w-full text-left text-sm p-3 rounded border border-outline-variant bg-white hover:border-primary transition-colors"
+                          >
+                            {version.map((b: string) => `• ${b}`).join('\n')}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setRewriteState({ id: null, loading: false, result: null })}
+                          className="text-xs text-on-surface-variant hover:underline"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -271,6 +479,19 @@ function App() {
                 <button type="submit" className="px-6 rounded bg-primary text-on-primary font-title-md text-title-md hover:opacity-90 transition-opacity">
                   <Icon name="add" />
                 </button>
+                <button
+                  type="button"
+                  onClick={handleSuggestSkills}
+                  disabled={suggestSkillsLoading}
+                  className="px-4 rounded border border-primary text-primary font-medium hover:bg-primary/5 transition-colors flex items-center gap-1 text-sm"
+                >
+                  {suggestSkillsLoading ? (
+                    <><div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div></>
+                  ) : (
+                    <Icon name="auto_awesome" className="text-[18px]" />
+                  )}
+                  Suggest AI
+                </button>
               </form>
               <div className="flex flex-wrap gap-2">
                 {data.skills.map((skill, i) => (
@@ -282,45 +503,241 @@ function App() {
                   </div>
                 ))}
               </div>
+              {suggestedSkills.length > 0 && (
+                <div className="border-t border-outline-variant pt-4">
+                  <p className="text-xs font-medium text-primary uppercase tracking-wider mb-3">AI Suggested Skills — click to add</p>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestedSkills.filter(s => !data.skills.includes(s)).map((skill, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { addSkill(skill); setSuggestedSkills(prev => prev.filter(s => s !== skill)); }}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-primary-container/40 text-primary rounded-full text-sm font-medium hover:bg-primary-container transition-colors border border-primary/20"
+                      >
+                        <Icon name="add" className="text-[14px]" /> {skill}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setSuggestedSkills([])}
+                    className="text-xs text-on-surface-variant hover:underline mt-2"
+                  >
+                    Dismiss suggestions
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );
       case 'analysis':
+        const aiResult = aiState.result || analysis;
+        return (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-headline-md text-headline-md text-on-surface mb-2">AI Analysis</h2>
+                <p className="font-body-md text-body-md text-on-surface-variant">CV Score and optimization tips.</p>
+              </div>
+              {aiState.loading && (
+                <div className="flex items-center gap-2 text-sm text-primary">
+                  <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                  Analyzing...
+                </div>
+              )}
+            </div>
+
+            {aiState.error && (
+              <div className="flex items-start gap-3 bg-error-container/20 p-3 rounded border border-error-container text-sm text-on-surface">
+                <Icon name="error" className="text-error mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium">AI unavailable — showing rule-based analysis</p>
+                  <p className="text-xs text-on-surface-variant mt-1">{aiState.error}</p>
+                </div>
+              </div>
+            )}
+
+            {!aiState.loading && (
+              <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-primary-container rounded-full text-on-primary-container">
+                      <Icon name="military_tech" />
+                    </div>
+                    <div>
+                      <h3 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-widest">{t('analysis.score')}</h3>
+                      <div className="text-4xl font-headline-md font-bold text-primary">{aiResult.total}<span className="text-lg text-on-surface-variant">/100</span></div>
+                    </div>
+                  </div>
+                  {aiState.result && <span className="text-[10px] text-green-600 font-medium uppercase tracking-wider">AI Powered</span>}
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    { key: t('analysis.breakdown.personal'), score: aiResult.breakdown.personal, max: 15 },
+                    { key: t('analysis.breakdown.summary'), score: aiResult.breakdown.summary, max: 15 },
+                    { key: t('analysis.breakdown.experience'), score: aiResult.breakdown.experience, max: 40 },
+                    { key: t('analysis.breakdown.education'), score: aiResult.breakdown.education, max: 15 },
+                    { key: t('analysis.breakdown.skills'), score: aiResult.breakdown.skills, max: 15 },
+                  ].map((item) => (
+                    <div key={item.key}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-on-surface font-medium">{item.key}</span>
+                        <span className="text-on-surface-variant">{item.score}/{item.max}</span>
+                      </div>
+                      <div className="w-full h-2 bg-surface-variant rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${(item.score / item.max) * 100}%`, backgroundColor: item.score / item.max >= 0.7 ? '#14B8A6' : item.score / item.max >= 0.4 ? '#F59E0B' : '#EF4444' }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-outline-variant pt-4 grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <div className="text-sm font-bold" style={{ color: aiResult.details.contactCompleteness.score >= 7 ? '#14B8A6' : '#F59E0B' }}>{aiResult.details.contactCompleteness.score}/{aiResult.details.contactCompleteness.max}</div>
+                    <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Contact</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold" style={{ color: aiResult.details.quantifiableMetrics.score >= 6 ? '#14B8A6' : '#F59E0B' }}>{aiResult.details.quantifiableMetrics.score}/{aiResult.details.quantifiableMetrics.max}</div>
+                    <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Metrics</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold" style={{ color: aiResult.details.actionVerbs.score >= 6 ? '#14B8A6' : '#F59E0B' }}>{aiResult.details.actionVerbs.score}/{aiResult.details.actionVerbs.max}</div>
+                    <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Action Verbs</div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-wider">{t('labels.topSuggestions')}</h4>
+                  {aiResult.suggestions.map((suggestion: string, idx: number) => (
+                    <div key={idx} className="flex items-start gap-3 bg-error-container/20 p-3 rounded border border-error-container text-on-surface text-sm">
+                      <Icon name="error" className="text-error mt-0.5 shrink-0" />
+                      <span>{suggestion}</span>
+                    </div>
+                  ))}
+                  {aiResult.suggestions.length === 0 && (
+                    <div className="flex items-center gap-3 text-sm text-green-600 bg-green-50 p-3 rounded">
+                      <Icon name="check_circle" />
+                      <span className="font-bold">{t('analysis.perfect')}!</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      case 'match':
         return (
           <div className="space-y-8 animate-in fade-in duration-300">
             <div>
-              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">AI Analysis</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant">CV Score and optimization tips.</p>
+              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">Job Match</h2>
+              <p className="font-body-md text-body-md text-on-surface-variant">Paste a job description to see how your CV matches.</p>
             </div>
-            <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-primary-container rounded-full text-on-primary-container">
-                    <Icon name="military_tech" />
-                  </div>
-                  <div>
-                    <h3 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-widest">{t('analysis.score')}</h3>
-                    <div className="text-4xl font-headline-md font-bold text-primary">{analysis.total}<span className="text-lg text-on-surface-variant">/100</span></div>
+            <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-5">
+              <textarea
+                value={jdText}
+                onChange={e => setJdText(e.target.value)}
+                placeholder="Paste job description here..."
+                rows={8}
+                className="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface resize-none"
+              />
+              <button
+                onClick={handleMatch}
+                disabled={matchLoading || !jdText.trim()}
+                className="w-full h-12 rounded-xl bg-primary text-on-primary font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {matchLoading ? (
+                  <><div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin"></div> Analyzing...</>
+                ) : (
+                  <><Icon name="search_insights" className="text-[20px]" /> Analyze Match</>
+                )}
+              </button>
+            </div>
+
+            {matchResult && (
+              <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-full bg-primary-container text-on-primary-container">
+                      <Icon name="fact_check" />
+                    </div>
+                    <div>
+                      <h3 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-widest">Match Score</h3>
+                      <div className="text-4xl font-headline-md font-bold" style={{ color: matchResult.matchScore >= 70 ? '#14B8A6' : matchResult.matchScore >= 45 ? '#F59E0B' : '#EF4444' }}>
+                        {matchResult.matchScore}<span className="text-lg text-on-surface-variant">%</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="space-y-4">
-                {analysis.suggestions.map((suggestion, idx) => (
-                  <div key={idx} className="flex items-start gap-3 bg-error-container/20 p-3 rounded border border-error-container text-on-surface text-sm">
-                    <Icon name="error" className="text-error mt-0.5 shrink-0" />
-                    <span>{suggestion}</span>
-                  </div>
-                ))}
-                {analysis.suggestions.length === 0 && (
-                  <div className="flex items-center gap-3 text-sm text-green-600 bg-green-50 p-3 rounded">
-                    <Icon name="check_circle" />
-                    <span className="font-bold">{t('analysis.perfect')}!</span>
+
+                <div className="space-y-2">
+                  {[
+                    { key: 'Keywords', score: matchResult.breakdown.keywords },
+                    { key: 'Skills', score: matchResult.breakdown.skills },
+                    { key: 'Experience', score: matchResult.breakdown.experience },
+                    { key: 'Education', score: matchResult.breakdown.education },
+                  ].map(item => (
+                    <div key={item.key}>
+                      <div className="flex justify-between text-sm mb-0.5">
+                        <span className="text-on-surface font-medium">{item.key}</span>
+                        <span className="text-on-surface-variant">{item.score}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${item.score}%`, backgroundColor: item.score >= 70 ? '#14B8A6' : item.score >= 45 ? '#F59E0B' : '#EF4444' }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-outline-variant pt-4">
+                  <p className="text-sm text-on-surface-variant mb-3">{matchResult.experienceGap}</p>
+                </div>
+
+                {matchResult.missingKeywords.length > 0 && (
+                  <div className="border-t border-outline-variant pt-4">
+                    <h4 className="font-label-small text-label-small text-error uppercase tracking-wider mb-3">Missing Keywords — click to add</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {matchResult.missingKeywords.map((kw: string, i: number) => (
+                        <button
+                          key={i}
+                          onClick={() => { addSkill(kw); }}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-error-container/40 text-error rounded-full text-sm font-medium hover:bg-error-container transition-colors border border-error/20"
+                        >
+                          <Icon name="add" className="text-[14px]" /> {kw}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
+
+                {matchResult.matchingKeywords.length > 0 && (
+                  <div className="border-t border-outline-variant pt-4">
+                    <h4 className="font-label-small text-label-small text-green-600 uppercase tracking-wider mb-3">Matching Keywords</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {matchResult.matchingKeywords.map((kw: string, i: number) => (
+                        <span key={i} className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-sm font-medium border border-green-200">
+                          <Icon name="check" className="text-[14px]" /> {kw}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t border-outline-variant pt-4 space-y-2">
+                  <h4 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-wider">Suggestions</h4>
+                  {matchResult.suggestions.map((s: string, i: number) => (
+                    <div key={i} className="flex items-start gap-3 bg-primary-container/20 p-3 rounded border border-primary-container text-sm text-on-surface">
+                      <Icon name="lightbulb" className="text-primary mt-0.5 shrink-0" />
+                      <span>{s}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         );
+
       case 'templates':
         return (
           <div className="space-y-8 animate-in fade-in duration-300">
@@ -350,6 +767,61 @@ function App() {
             </div>
           </div>
         );
+      case 'settings':
+        return (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <div>
+              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.settings')}</h2>
+              <p className="font-body-md text-body-md text-on-surface-variant">Customize your CV appearance and manage data.</p>
+            </div>
+            <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-8">
+              <div>
+                <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">{t('labels.color')}</h3>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="w-12 h-12 rounded-lg border border-outline-variant cursor-pointer"
+                  />
+                  <span className="text-sm text-on-surface-variant font-mono">{primaryColor}</span>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">{t('labels.font')}</h3>
+                <div className="flex gap-2">
+                  {(['sans', 'serif', 'mono'] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setFontFamily(f)}
+                      className={`px-6 py-3 rounded-lg border text-sm font-medium transition-all ${
+                        fontFamily === f
+                          ? 'border-primary bg-primary-container/20 text-primary ring-2 ring-primary/20'
+                          : 'border-outline-variant text-on-surface-variant hover:border-primary/50'
+                      }`}
+                    >
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">{t('labels.dataManagement')}</h3>
+                <p className="text-sm text-on-surface-variant mb-4">{t('labels.tip')}</p>
+                <button
+                  onClick={() => {
+                    if (window.confirm(t('common.confirmReset'))) {
+                      resetData();
+                    }
+                  }}
+                  className="px-6 py-3 rounded-lg border border-error text-error font-medium hover:bg-error-container/20 transition-colors"
+                >
+                  {t('common.reset')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
       default:
         return null;
     }
@@ -364,9 +836,28 @@ function App() {
             SwiftCv
           </div>
           <div className="w-px h-6 bg-surface-variant"></div>
-          <span className="text-on-surface-variant font-medium">The International Standard</span>
+          <span className="text-on-surface-variant font-medium">{t(`templates.${currentTemplate}.name`)}</span>
         </div>
         <div className="flex items-center gap-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImportJSON}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="h-10 px-4 rounded-full border border-outline text-primary font-medium hover:bg-primary/5 transition-colors text-sm"
+          >
+            {t('common.import')}
+          </button>
+          <button
+            onClick={handleExportJSON}
+            className="h-10 px-4 rounded-full border border-outline text-primary font-medium hover:bg-primary/5 transition-colors text-sm"
+          >
+            {t('common.export')}
+          </button>
           <button 
             onClick={() => {
               const newLang = language === 'en' ? 'vi' : 'en';
@@ -376,6 +867,13 @@ function App() {
             className="h-10 px-6 rounded-full border border-outline text-primary font-medium hover:bg-primary/5 transition-colors uppercase"
           >
             {language}
+          </button>
+          <button
+            onClick={() => setShowPreview(!showPreview)}
+            className="md:hidden h-10 w-10 rounded-full border border-outline text-primary flex items-center justify-center hover:bg-primary/5 transition-colors"
+            title={showPreview ? 'Hide preview' : 'Show preview'}
+          >
+            <Icon name="visibility" className="text-[20px]" filled={showPreview} />
           </button>
           <button 
             onClick={handlePrint}
@@ -449,19 +947,33 @@ function App() {
         </section>
 
         {/* Right Panel: Canvas Preview (60%) */}
-        <section className="hidden md:flex flex-col w-[60%] bg-surface-container-low p-8 overflow-y-auto items-center custom-scrollbar">
+        <section className={`flex-col w-[60%] bg-surface-container-low p-8 overflow-y-auto items-center custom-scrollbar ${showPreview ? 'flex absolute inset-0 z-40 md:relative' : 'hidden md:flex'}`}>
           {/* Canvas Toolbar */}
           <div className="w-full max-w-[850px] flex justify-between items-center mb-6 no-print">
-            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 rounded-full border border-surface-variant shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-[#14B8A6]"></span>
-              <span className="text-xs font-medium text-on-surface-variant">Auto-saved</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPreview(false)}
+                className="md:hidden h-10 w-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 transition-colors"
+              >
+                <Icon name="close" className="text-[20px]" />
+              </button>
+              <div className="flex items-center gap-2 bg-surface px-3 py-1.5 rounded-full border border-surface-variant shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-[#14B8A6]"></span>
+                <span className="text-xs font-medium text-on-surface-variant">Auto-saved</span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              <button className="w-10 h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors">
+              <button
+                onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.1))}
+                className="w-10 h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors"
+              >
                 <Icon name="zoom_out" className="text-[20px]" />
               </button>
-              <span className="font-label-small text-label-small text-on-surface-variant w-12 text-center">100%</span>
-              <button className="w-10 h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors">
+              <span className="font-label-small text-label-small text-on-surface-variant w-12 text-center">{Math.round(zoomLevel * 100)}%</span>
+              <button
+                onClick={() => setZoomLevel(Math.min(1.5, zoomLevel + 0.1))}
+                className="w-10 h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors"
+              >
                 <Icon name="zoom_in" className="text-[20px]" />
               </button>
             </div>
@@ -470,12 +982,13 @@ function App() {
           {/* The CV Paper */}
           <div 
             ref={resumeRef}
-            className="cv-paper bg-white w-full max-w-[850px] min-h-[1100px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] ring-1 ring-black/5 flex flex-col font-cv-serif text-on-surface origin-top overflow-hidden"
+            className="cv-paper bg-white w-full max-w-[850px] min-h-[1100px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] ring-1 ring-black/5 flex flex-col font-cv-serif text-on-surface overflow-hidden"
+            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
           >
-            {currentTemplate === 'standard' && <StandardTemplate data={data} />}
-            {currentTemplate === 'executive' && <MinimalistTemplate data={data} />}
-            {currentTemplate === 'tech' && <PixelsTemplate data={data} />}
-            {currentTemplate === 'creative' && <CreativeTemplate data={data} />}
+            {currentTemplate === 'standard' && <StandardTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'executive' && <MinimalistTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'tech' && <PixelsTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'creative' && <CreativeTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
           </div>
           <div className="h-16 w-full shrink-0 no-print"></div>
         </section>
