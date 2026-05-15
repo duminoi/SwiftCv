@@ -1,22 +1,27 @@
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+const OPENCODE_API_KEY = process.env.OPENCODE_API_KEY;
+const OPENROUTER_KEY = process.env.OPENROUTER_KEY;
+
+// Config via env vars — set ZEN_MODEL and ZEN_API_URL to customize
+// Free models: big-pickle | deepseek-v4-flash-free | minimax-m2.5-free | nemotron-3-super-free
+const ZEN_API_URL = process.env.ZEN_API_URL || 'https://opencode.ai/zen/v1/chat/completions';
+const ZEN_MODEL = process.env.ZEN_MODEL || 'big-pickle';
 
 export async function callAI(systemPrompt: string, userPrompt: string): Promise<string> {
-  // Try OpenRouter first (has free models)
+  // Try OpenCode Zen first (primary)
+  if (OPENCODE_API_KEY) {
+    try {
+      return await callZen(systemPrompt, userPrompt);
+    } catch (e) {
+      console.warn('Zen API failed, falling back...', e);
+    }
+  }
+
+  // Try OpenRouter as secondary fallback
   if (OPENROUTER_KEY) {
     try {
       return await callOpenRouter(systemPrompt, userPrompt);
     } catch (e) {
-      console.warn('OpenRouter failed, falling back...', e);
-    }
-  }
-
-  // Try Gemini
-  if (GEMINI_KEY) {
-    try {
-      return await callGemini(systemPrompt, userPrompt);
-    } catch (e) {
-      console.warn('Gemini failed, falling back to demo...', e);
+      console.warn('OpenRouter failed, falling back to demo...', e);
     }
   }
 
@@ -24,21 +29,38 @@ export async function callAI(systemPrompt: string, userPrompt: string): Promise<
   return callDemoAI(systemPrompt, userPrompt);
 }
 
-async function callGemini(system: string, user: string): Promise<string> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: `${system}\n\n${user}` }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
-      }),
-    }
-  );
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-  const data = await res.json();
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+async function callZen(system: string, user: string): Promise<string> {
+  const res = await fetch(ZEN_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENCODE_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: ZEN_MODEL,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: 0.3,
+      max_tokens: 4096,
+    }),
+  });
+  const rawText = await res.text();
+  console.log(`[Zen API] Status: ${res.status}, Response length: ${rawText.length}`);
+  if (!res.ok) throw new Error(`Zen API ${res.status}: ${rawText}`);
+  
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch (e) {
+    console.error('[Zen API] Failed to parse JSON. Raw response:', rawText.substring(0, 500));
+    throw new Error(`Zen API returned invalid JSON: ${rawText.substring(0, 200)}`);
+  }
+  
+  const content = data?.choices?.[0]?.message?.content || '';
+  console.log(`[Zen API] Response content length: ${content.length}`);
+  return content;
 }
 
 async function callOpenRouter(system: string, user: string): Promise<string> {
@@ -64,15 +86,16 @@ async function callOpenRouter(system: string, user: string): Promise<string> {
 }
 
 // ── Demo mode: no API key needed, returns realistic template responses ──
-function callDemoAI(system: string, user: string): Promise<string> {
+export function callDemoAI(system: string, user: string): Promise<string> {
   const mode = system.includes('how well this CV matches') ? 'match'
     : system.includes('ATS optimization') ? 'analyze'
     : system.includes('CV writer') && system.includes('3') ? 'rewrite-summary'
     : system.includes('CV writer') ? 'rewrite-bullets'
     : system.includes('career advisor') ? 'suggest-skills'
+    : system.includes('cover letter') ? 'cover-letter'
+    : system.includes('data extraction') ? 'linkedin-import'
     : 'analyze';
 
-  // Extract info from user prompt for contextual responses
   const hasMetrics = /\d+%|\$|[\d]+ (users|customers|revenue|clients)/i.test(user);
   const bulletCount = (user.match(/•|bullet|achieved|led|managed/gi) || []).length;
   const skillsMatch = user.match(/Current skills: (.*?)(?:\n|$)/);
@@ -105,7 +128,7 @@ function callDemoAI(system: string, user: string): Promise<string> {
               'Quantify achievements with metrics relevant to the job description',
               'Add a skills section that mirrors the key requirements listed',
             ].slice(0, 4 + Math.floor(Math.random() * 2)),
-            experienceGpa: 'Your experience level appears aligned with the seniority of this role.',
+            experienceGap: 'Your experience level appears aligned with the seniority of this role.',
           }));
           break;
         }
@@ -177,6 +200,44 @@ function callDemoAI(system: string, user: string): Promise<string> {
           const existing = new Set(currentSkills.map(s => s.toLowerCase()));
           const suggested = allSkills.filter(s => !existing.has(s.toLowerCase())).slice(0, 12);
           resolve(JSON.stringify(suggested));
+          break;
+        }
+        case 'cover-letter': {
+          const companyName = user.match(/Company: (.+?)(?:\n|$)/)?.[1] || 'the company';
+          const jobTitle = user.match(/Position: (.+?)(?:\n|$)/)?.[1] || 'the position';
+          resolve(JSON.stringify({
+            subject: `Application for ${jobTitle} - ${companyName}`,
+            body: `Dear Hiring Manager,\n\nI am writing to express my strong interest in the ${jobTitle} position at ${companyName}. With a proven track record of delivering measurable results and driving operational excellence, I am confident in my ability to make an immediate impact on your team.\n\nThroughout my career, I have consistently demonstrated the ability to lead cross-functional initiatives, optimize processes, and deliver projects that exceed expectations. My experience aligns directly with the requirements outlined in your job description, and I am excited about the opportunity to bring my expertise to ${companyName}.\n\nI would welcome the opportunity to discuss how my background, skills, and enthusiasm can contribute to your organization's continued success. Thank you for considering my application.\n\nSincerely,\n[Your Name]`,
+            salutation: 'Best regards',
+          }));
+          break;
+        }
+        case 'linkedin-import': {
+          resolve(JSON.stringify({
+            fullName: 'John Doe',
+            jobTitle: 'Senior Software Engineer',
+            email: 'john@example.com',
+            phone: '+1-555-0123',
+            address: 'San Francisco, CA',
+            summary: 'Experienced software engineer with 8+ years building scalable web applications.',
+            linkedin: 'https://linkedin.com/in/johndoe',
+            experiences: [
+              { id: 'exp1', company: 'Tech Corp', position: 'Senior Engineer', startDate: '2020-01', endDate: 'Present', bulletPoints: '<ul><li>Led team of 5 engineers to deliver microservices platform</li><li>Reduced API response time by 40%</li></ul>' },
+            ],
+            educations: [
+              { id: 'edu1', school: 'UC Berkeley', degree: 'BS Computer Science', startDate: '2012-09', endDate: '2016-05' },
+            ],
+            skills: ['JavaScript', 'React', 'Node.js', 'Python', 'AWS'],
+          }));
+          break;
+        }
+        case 'generate-summary': {
+          const jobTitle = user.match(/Target Role: (.+?)(?:\n|$)/)?.[1] || 'Professional';
+          resolve(JSON.stringify([
+            `Dynamic ${jobTitle} with extensive experience driving business growth through innovative solutions and strategic leadership. Proven ability to manage complex projects, build high-performing teams, and deliver results that exceed organizational objectives.`,
+            `Results-oriented ${jobTitle} recognized for combining technical expertise with business acumen to solve complex challenges. Track record of implementing process improvements that reduced costs by 25% while increasing team productivity and stakeholder satisfaction.`,
+            `Accomplished ${jobTitle} with a passion for excellence and a history of transformative impact. Expertise spans strategic planning, cross-functional collaboration, and data-driven decision making that consistently delivers measurable business outcomes.`,
+          ]));
           break;
         }
         default:

@@ -61,9 +61,9 @@ function countMetrics(text: string): number {
   return matches ? matches.length : 0;
 }
 
-const t = (vi: string, en: string, lang: 'en' | 'vi') => lang === 'vi' ? vi : en;
+const t = (vi: string, en: string, lang: string) => lang === 'vi' ? vi : en;
 
-export const analyzeCV = (data: CVData, lang: 'en' | 'vi'): ScoreResult => {
+export const analyzeCV = (data: CVData, lang: 'en' | 'vi' | 'ja' | 'ko' | 'zh' | 'es' | 'fr' | 'de'): ScoreResult => {
   const suggestions: string[] = [];
   const breakdown = { personal: 0, summary: 0, experience: 0, education: 0, skills: 0 };
   const details = {

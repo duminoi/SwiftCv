@@ -4,6 +4,14 @@
 body {
   background-color: theme('colors.background');
   color: theme('colors.on-background');
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safe area for mobile devices with notches */
+@supports (padding: max(0px)) {
+  .safe-area-bottom {
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+  }
 }
 
 @layer utilities {
@@ -29,6 +37,62 @@ body {
   .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+  }
+
+  /* Responsive text sizes */
+  .text-responsive-xs {
+    font-size: clamp(0.625rem, 0.5rem + 0.5vw, 0.75rem);
+  }
+  .text-responsive-sm {
+    font-size: clamp(0.75rem, 0.625rem + 0.5vw, 0.875rem);
+  }
+  .text-responsive-base {
+    font-size: clamp(0.875rem, 0.75rem + 0.5vw, 1rem);
+  }
+  .text-responsive-lg {
+    font-size: clamp(1rem, 0.875rem + 0.5vw, 1.125rem);
+  }
+  .text-responsive-xl {
+    font-size: clamp(1.125rem, 1rem + 0.5vw, 1.25rem);
+  }
+  .text-responsive-2xl {
+    font-size: clamp(1.25rem, 1rem + 0.75vw, 1.5rem);
+  }
+  .text-responsive-3xl {
+    font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  }
+}
+
+@media (max-width: 640px) {
+  /* Mobile optimizations */
+  .cv-paper {
+    transform-origin: top left !important;
+  }
+  
+  /* Prevent horizontal scroll on mobile */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Improve touch targets on mobile */
+  button, a, input, select, textarea {
+    min-height: 44px;
+  }
+  
+  /* Adjust form inputs for mobile */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="url"],
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+}
+
+@media (max-width: 480px) {
+  /* Extra small mobile optimizations */
+  .cv-paper {
+    min-height: auto !important;
   }
 }
 
@@ -96,7 +160,8 @@ body {
   }
   
   .cv-paper .prose p {
-    margin-top: 0.25rem !important;
-    margin-bottom: 0.25rem !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+    line-height: 1.6 !important;
   }
 }

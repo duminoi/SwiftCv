@@ -10,17 +10,17 @@ const FONT_MAP = { sans: 'Inter, system-ui, sans-serif', serif: "'Noto Serif', s
 
 export const MinimalistTemplate = ({ data, primaryColor = '#1a1a1a', fontFamily = 'serif' }: Props) => (
   <div className="bg-white w-full min-h-[1100px] relative origin-top h-full">
-    <div className="p-[80px] text-[#1a1a1a] flex flex-col gap-12" style={{ fontFamily: FONT_MAP[fontFamily] }}>
-      <div className="text-center flex flex-col gap-4">
-        <h1 className="text-[42px] leading-tight font-bold tracking-tight uppercase" style={{ fontFamily: "'Noto Serif', serif" }}>{data.personalInfo.fullName || 'YOUR NAME'}</h1>
-        <p className="text-[14px] uppercase tracking-[0.2em]" style={{ color: primaryColor }}>{data.personalInfo.jobTitle || 'Job Title'}</p>
+    <div className="p-6 sm:p-[80px] text-[#1a1a1a] flex flex-col gap-8 sm:gap-12" style={{ fontFamily: FONT_MAP[fontFamily] }}>
+      <div className="text-center flex flex-col gap-3 sm:gap-4">
+        <h1 className="text-2xl sm:text-[42px] leading-tight font-bold tracking-tight uppercase" style={{ fontFamily: "'Noto Serif', serif" }}>{data.personalInfo.fullName || 'YOUR NAME'}</h1>
+        <p className="text-xs sm:text-[14px] uppercase tracking-[0.2em]" style={{ color: primaryColor }}>{data.personalInfo.jobTitle || 'Job Title'}</p>
 
-        <div className="flex justify-center items-center flex-wrap gap-x-6 gap-y-2 mt-2 text-[11px] text-[#444444] tracking-wide">
-          {data.personalInfo.email && <span>{data.personalInfo.email}</span>}
+        <div className="flex justify-center items-center flex-wrap gap-x-4 sm:gap-x-6 gap-y-2 mt-2 text-[10px] sm:text-[11px] text-[#444444] tracking-wide">
+          {data.personalInfo.email && <span className="truncate max-w-[120px] sm:max-w-none">{data.personalInfo.email}</span>}
           {data.personalInfo.email && data.personalInfo.phone && <span className="w-[3px] h-[3px] rounded-full bg-[#999999]"></span>}
           {data.personalInfo.phone && <span>{data.personalInfo.phone}</span>}
           {(data.personalInfo.email || data.personalInfo.phone) && data.personalInfo.address && <span className="w-[3px] h-[3px] rounded-full bg-[#999999]"></span>}
-          {data.personalInfo.address && <span>{data.personalInfo.address}</span>}
+          {data.personalInfo.address && <span className="truncate max-w-[120px] sm:max-w-none">{data.personalInfo.address}</span>}
         </div>
       </div>
 
@@ -29,24 +29,24 @@ export const MinimalistTemplate = ({ data, primaryColor = '#1a1a1a', fontFamily 
       {data.personalInfo.summary && (
         <div>
           <div
-            className="text-[13px] leading-relaxed text-justify text-[#333333] prose prose-sm max-w-none"
+            className="text-[11px] sm:text-[13px] leading-relaxed text-justify text-[#333333] prose prose-sm max-w-none"
             dangerouslySetInnerHTML={{ __html: data.personalInfo.summary }}
           />
         </div>
       )}
 
       {data.experiences.length > 0 && (
-        <div className="flex flex-col gap-8">
-          <h2 className="text-[11px] uppercase tracking-[0.25em] font-bold text-[#1a1a1a] pb-2 border-b border-[#e5e5e5]">Professional Experience</h2>
+        <div className="flex flex-col gap-6 sm:gap-8">
+          <h2 className="text-[10px] sm:text-[11px] uppercase tracking-[0.25em] font-bold text-[#1a1a1a] pb-2 border-b border-[#e5e5e5]">Professional Experience</h2>
           {data.experiences.map(exp => (
-            <div key={exp.id} className="flex flex-col gap-3">
-              <div className="flex justify-between items-baseline">
-                <h3 className="text-[14px] font-bold">{exp.company || 'Company'}</h3>
-                <span className="text-[11px] tracking-wide" style={{ color: primaryColor }}>{exp.startDate} — {exp.endDate}</span>
+            <div key={exp.id} className="flex flex-col gap-2 sm:gap-3">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline gap-1">
+                <h3 className="text-[12px] sm:text-[14px] font-bold">{exp.company || 'Company'}</h3>
+                <span className="text-[10px] sm:text-[11px] tracking-wide" style={{ color: primaryColor }}>{exp.startDate} — {exp.endDate}</span>
               </div>
-              <p className="text-[12px] italic text-[#444444]">{exp.position || 'Position'}</p>
+              <p className="text-[11px] sm:text-[12px] italic text-[#444444]">{exp.position || 'Position'}</p>
               <div
-                className="prose prose-sm max-w-none text-[12px] leading-relaxed text-[#333333]"
+                className="prose prose-sm max-w-none text-[11px] sm:text-[12px] leading-relaxed text-[#333333]"
                 dangerouslySetInnerHTML={{ __html: exp.bulletPoints }}
               />
             </div>
@@ -54,26 +54,26 @@ export const MinimalistTemplate = ({ data, primaryColor = '#1a1a1a', fontFamily 
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-12">
         {data.educations.length > 0 && (
-          <div className="flex flex-col gap-6">
-            <h2 className="text-[11px] uppercase tracking-[0.25em] font-bold text-[#1a1a1a] pb-2 border-b border-[#e5e5e5]">Education</h2>
+          <div className="flex flex-col gap-4 sm:gap-6">
+            <h2 className="text-[10px] sm:text-[11px] uppercase tracking-[0.25em] font-bold text-[#1a1a1a] pb-2 border-b border-[#e5e5e5]">Education</h2>
             {data.educations.map(edu => (
               <div key={edu.id} className="flex flex-col gap-1">
-                <h3 className="text-[13px] font-bold">{edu.school || 'School'}</h3>
-                <p className="text-[12px] text-[#444444]">{edu.degree || 'Degree'}</p>
-                <span className="text-[11px] text-[#666666] mt-1">{edu.startDate} - {edu.endDate}</span>
+                <h3 className="text-[12px] sm:text-[13px] font-bold">{edu.school || 'School'}</h3>
+                <p className="text-[11px] sm:text-[12px] text-[#444444]">{edu.degree || 'Degree'}</p>
+                <span className="text-[10px] sm:text-[11px] text-[#666666] mt-1">{edu.startDate} - {edu.endDate}</span>
               </div>
             ))}
           </div>
         )}
 
         {data.skills.length > 0 && (
-          <div className="flex flex-col gap-6">
-            <h2 className="text-[11px] uppercase tracking-[0.25em] font-bold text-[#1a1a1a] pb-2 border-b border-[#e5e5e5]">Core Competencies</h2>
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
+          <div className="flex flex-col gap-4 sm:gap-6">
+            <h2 className="text-[10px] sm:text-[11px] uppercase tracking-[0.25em] font-bold text-[#1a1a1a] pb-2 border-b border-[#e5e5e5]">Core Competencies</h2>
+            <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-2">
               {data.skills.map((skill, i) => (
-                <span key={i} className="text-[12px] text-[#333333]">{skill}</span>
+                <span key={i} className="text-[11px] sm:text-[12px] text-[#333333]">{skill}</span>
               ))}
             </div>
           </div>

@@ -1,0 +1,32 @@
+{
+  "name": "SwiftCv - ATS-Optimized Resume Builder",
+  "short_name": "SwiftCv",
+  "description": "Build professional, ATS-optimized resumes with AI assistance",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0061a4",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "shortcuts": [
+    {
+      "name": "New CV",
+      "url": "/",
+      "description": "Create a new resume"
+    }
+  ]
+}

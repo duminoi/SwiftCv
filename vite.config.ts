@@ -12,4 +12,7 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'zustand', 'zustand/middleware', 'react-i18next', 'i18next'],
+  },
 })

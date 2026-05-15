@@ -1,14 +1,17 @@
-import React, { useRef, useMemo, useState } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCVStore } from './store/useCVStore';
+import type { JobStatus } from './store/useCVStore';
 import { analyzeCV } from './store/cvAnalyzer';
 import html2pdf from 'html2pdf.js';
 import { StandardTemplate } from './components/templates/StandardTemplate';
 import { MinimalistTemplate } from './components/templates/MinimalistTemplate';
 import { PixelsTemplate } from './components/templates/PixelsTemplate';
 import { CreativeTemplate } from './components/templates/CreativeTemplate';
+import { ModernTemplate } from './components/templates/ModernTemplate';
+import { TimelineTemplate } from './components/templates/TimelineTemplate';
 import { RichTextEditor } from './components/RichTextEditor';
-import { analyzeCV as apiAnalyze, rewriteSummary, rewriteBullets, suggestSkills, matchJD } from './services/api';
+import { analyzeCV as apiAnalyze, rewriteSummary, rewriteBullets, suggestSkills, generateSummary, matchJD, saveCVToCloud, generateCoverLetter, createCheckoutSession, importLinkedIn } from './services/api';
 import './i18n';
 
 // --- Sub-components ---
@@ -101,23 +104,55 @@ function App() {
     setFontFamily,
     resetData,
     importData,
+    cvs,
+    currentCvId,
+    createCV,
+    switchCV,
+    deleteCV,
+    renameCV,
+    coverLetters,
+    addCoverLetter,
+    removeCoverLetter,
+    jobs,
+    addJob,
+    removeJob,
+    moveJob,
+    userTier,
+    usageCount,
   } = useCVStore();
   
-  const [activeTab, setActiveTab] = useState<'personal' | 'experience' | 'education' | 'skills' | 'analysis' | 'templates' | 'settings' | 'match'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'experience' | 'education' | 'skills' | 'analysis' | 'templates' | 'settings' | 'match' | 'coverletter' | 'jobtracker' | 'pricing'>('personal');
   const [newSkill, setNewSkill] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const resumeRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [aiState, setAiState] = useState<{ loading: boolean; result: any; error: string | null }>({ loading: false, result: null, error: null });
+  const [aiErrorToast, setAiErrorToast] = useState<string | null>(null);
   const [rewriteState, setRewriteState] = useState<{ id: string | null; loading: boolean; result: any }>({ id: null, loading: false, result: null });
   const [suggestedSkills, setSuggestedSkills] = useState<string[]>([]);
   const [suggestSkillsLoading, setSuggestSkillsLoading] = useState(false);
+  const [generateSummaryLoading, setGenerateSummaryLoading] = useState(false);
   const [jdText, setJdText] = useState('');
   const [matchResult, setMatchResult] = useState<any>(null);
   const [matchLoading, setMatchLoading] = useState(false);
+
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error' | 'offline'>('synced');
+  const [showCvMenu, setShowCvMenu] = useState(false);
+  const [renamingCv, setRenamingCv] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+
+
+  const [coverLetterForm, setCoverLetterForm] = useState<{ companyName: string; jobTitle: string; tone: 'professional' | 'modern' }>({ companyName: '', jobTitle: '', tone: 'professional' });
+  const [linkedinImportText, setLinkedinImportText] = useState('');
+  const [linkedinImportLoading, setLinkedinImportLoading] = useState(false);
+  const [clResult, setClResult] = useState<any>(null);
+  const [clLoading, setClLoading] = useState(false);
+
+  const [newJob, setNewJob] = useState<{ company: string; position: string; url: string }>({ company: '', position: '', url: '' });
 
   const analysis = useMemo(() => analyzeCV(data, language), [data, language]);
 
@@ -138,6 +173,8 @@ function App() {
       .then(result => setAiState({ loading: false, result, error: null }))
       .catch(err => {
         setAiState({ loading: false, result: null, error: err.message });
+        setAiErrorToast(err.message.includes('401') ? 'AI API key không hợp lệ. Kiểm tra OPENCODE_API_KEY trong .env' : `AI error: ${err.message}`);
+        setTimeout(() => setAiErrorToast(null), 8000);
       });
   }, [activeTab, data, language]);
 
@@ -150,6 +187,8 @@ function App() {
       setRewriteState({ id, loading: false, result });
     } catch (err: any) {
       setRewriteState({ id, loading: false, result: null });
+      setAiErrorToast(`AI Rewrite thất bại: ${err.message}`);
+      setTimeout(() => setAiErrorToast(null), 6000);
     }
   };
 
@@ -158,10 +197,25 @@ function App() {
     try {
       const skills = await suggestSkills(data.experiences, data.personalInfo.summary, data.skills, language);
       setSuggestedSkills(Array.isArray(skills) ? skills : []);
-    } catch {
+    } catch (err: any) {
       setSuggestedSkills([]);
+      setAiErrorToast(`AI Suggest thất bại: ${err.message}`);
+      setTimeout(() => setAiErrorToast(null), 6000);
     } finally {
       setSuggestSkillsLoading(false);
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    setGenerateSummaryLoading(true);
+    try {
+      const result = await generateSummary(data.experiences, data.educations, data.personalInfo.jobTitle, language);
+      setRewriteState({ id: null, loading: false, result: Array.isArray(result) ? result : [] });
+    } catch (err: any) {
+      setAiErrorToast(`AI Generate thất bại: ${err.message}`);
+      setTimeout(() => setAiErrorToast(null), 6000);
+    } finally {
+      setGenerateSummaryLoading(false);
     }
   };
 
@@ -172,11 +226,120 @@ function App() {
     try {
       const result = await matchJD(data, jdText, language);
       setMatchResult(result);
-    } catch {
+    } catch (err: any) {
       setMatchResult(null);
+      setAiErrorToast(`Job Match thất bại: ${err.message}`);
+      setTimeout(() => setAiErrorToast(null), 6000);
     } finally {
       setMatchLoading(false);
     }
+  };
+
+  const handleCloudSync = async () => {
+    setSyncStatus('syncing');
+    try {
+      const project = { id: currentCvId, name: cvs.find(c => c.id === currentCvId)?.name || 'My CV', data, template: currentTemplate, primaryColor, fontFamily, updatedAt: new Date().toISOString() };
+      await saveCVToCloud(project as any);
+      setSyncStatus('synced');
+    } catch {
+      setSyncStatus('error');
+    }
+  };
+
+  useEffect(() => {
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => { });
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(handleCloudSync, 5000);
+    return () => clearTimeout(timer);
+  }, [data, currentTemplate, primaryColor, fontFamily]);
+
+  const handleCreateCV = () => {
+    createCV(`CV #${cvs.length + 1}`);
+    setShowCvMenu(false);
+  };
+
+  const handleDeleteCV = (id: string) => {
+    deleteCV(id);
+    setShowCvMenu(false);
+  };
+
+  const handleStartRename = (id: string, currentName: string) => {
+    setRenamingCv(id);
+    setRenameValue(currentName);
+  };
+
+  const handleFinishRename = (id: string) => {
+    if (renameValue.trim()) renameCV(id, renameValue.trim());
+    setRenamingCv(null);
+    setRenameValue('');
+  };
+
+  const handleGenerateCoverLetter = async () => {
+    if (!coverLetterForm.companyName.trim()) return;
+    setClLoading(true);
+    setClResult(null);
+    try {
+      const result = await generateCoverLetter(data, coverLetterForm.companyName, coverLetterForm.jobTitle, coverLetterForm.tone, language);
+      setClResult(result);
+      addCoverLetter({
+        id: crypto.randomUUID(),
+        companyName: coverLetterForm.companyName,
+        jobTitle: coverLetterForm.jobTitle,
+        content: result.body || '',
+        tone: coverLetterForm.tone,
+        createdAt: new Date().toISOString(),
+      });
+    } catch {
+      setClResult(null);
+    } finally {
+      setClLoading(false);
+    }
+  };
+
+  const handleUpgrade = async (tier: string) => {
+    const priceIds: Record<string, string> = { pro: 'price_pro', business: 'price_business', lifetime: 'price_lifetime' };
+    const priceId = priceIds[tier];
+    if (!priceId) return;
+    try {
+      const result = await createCheckoutSession(priceId);
+      if (result.url) window.location.href = result.url;
+    } catch { }
+  };
+
+  const handleLinkedInImport = async () => {
+    if (!linkedinImportText.trim()) return;
+    setLinkedinImportLoading(true);
+    try {
+      const result = await importLinkedIn(linkedinImportText);
+      if (result.fullName || result.experiences) {
+        importData({
+          personalInfo: {
+            fullName: result.fullName || data.personalInfo.fullName,
+            jobTitle: result.jobTitle || data.personalInfo.jobTitle,
+            email: result.email || data.personalInfo.email,
+            phone: result.phone || data.personalInfo.phone,
+            address: result.address || data.personalInfo.address,
+            summary: result.summary || data.personalInfo.summary,
+            linkedin: result.linkedin || data.personalInfo.linkedin,
+          },
+          experiences: result.experiences || data.experiences,
+          educations: result.educations || data.educations,
+          skills: result.skills || data.skills,
+        });
+      }
+    } catch { }
+    setLinkedinImportLoading(false);
+  };
+
+  const handleAddJob = () => {
+    if (!newJob.company.trim() || !newJob.position.trim()) return;
+    addJob({ company: newJob.company, position: newJob.position, url: newJob.url, status: 'saved', notes: '' });
+    setNewJob({ company: '', position: '', url: '' });
   };
 
   const handleExportJSON = () => {
@@ -267,8 +430,11 @@ function App() {
   const toolTabs = [
     { id: 'analysis', label: 'AI Analysis', icon: 'insights', short: 'AI' },
     { id: 'match', label: 'Job Match', icon: 'search_insights', short: 'Match' },
+    { id: 'jobtracker', label: 'Job Tracker', icon: 'track_changes', short: 'Jobs' },
     { id: 'templates', label: 'Templates', icon: 'palette', short: 'Theme' },
+    { id: 'coverletter', label: 'Cover Letter', icon: 'article', short: 'Cover' },
     { id: 'settings', label: t('sections.settings'), icon: 'settings', short: 'Setup' },
+    { id: 'pricing', label: 'Upgrade', icon: 'workspace_premium', short: 'Pro' },
   ];
 
   const renderTabContent = () => {
@@ -286,67 +452,80 @@ function App() {
                 {sectionProgress.personalFilled}/4 filled
               </div>
             </div>
-            <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-5">
-              <div className="grid grid-cols-2 gap-5">
-                <InputField label={t('labels.fullName')} value={data.personalInfo.fullName} onChange={(v: any) => updatePersonalInfo({ fullName: v })} />
-                <InputField label={t('labels.jobTitle')} value={data.personalInfo.jobTitle} onChange={(v: any) => updatePersonalInfo({ jobTitle: v })} />
-              </div>
-              <div className="flex items-center gap-4">
-                {data.personalInfo.photo && (
-                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-outline-variant shrink-0">
-                    <img src={data.personalInfo.photo} alt="Photo" className="w-full h-full object-cover" />
-                  </div>
-                )}
-                <label className="flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant cursor-pointer hover:bg-surface-variant/30 transition-colors text-sm text-primary font-medium">
-                  <Icon name="add_a_photo" className="text-[18px]" />
-                  {data.personalInfo.photo ? t('common.uploadPhoto') : 'Add Photo'}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file || file.size > 2 * 1024 * 1024) return;
-                      const reader = new FileReader();
-                      reader.onload = (ev) => updatePersonalInfo({ photo: ev.target?.result as string });
-                      reader.readAsDataURL(file);
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-                {data.personalInfo.photo && (
-                  <button
-                    onClick={() => updatePersonalInfo({ photo: undefined })}
-                    className="text-sm text-error hover:underline"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-5">
-                <InputField label={t('labels.email')} value={data.personalInfo.email} onChange={(v: any) => updatePersonalInfo({ email: v })} />
-                <InputField label={t('labels.phone')} value={data.personalInfo.phone} onChange={(v: any) => updatePersonalInfo({ phone: v })} />
-              </div>
-              <InputField label={t('labels.address')} value={data.personalInfo.address} onChange={(v: any) => updatePersonalInfo({ address: v })} />
-              <div className="grid grid-cols-2 gap-5">
-                <InputField label="LinkedIn" value={data.personalInfo.linkedin} onChange={(v: any) => updatePersonalInfo({ linkedin: v })} />
-                <InputField label="GitHub" value={data.personalInfo.github} onChange={(v: any) => updatePersonalInfo({ github: v })} />
-                <InputField label="Portfolio" value={data.personalInfo.portfolio} onChange={(v: any) => updatePersonalInfo({ portfolio: v })} />
-              </div>
+             <div className="bg-surface-container-lowest p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm space-y-4 sm:space-y-5">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                 <InputField label={t('labels.fullName')} value={data.personalInfo.fullName} onChange={(v: any) => updatePersonalInfo({ fullName: v })} />
+                 <InputField label={t('labels.jobTitle')} value={data.personalInfo.jobTitle} onChange={(v: any) => updatePersonalInfo({ jobTitle: v })} />
+               </div>
+               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                 {data.personalInfo.photo && (
+                   <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-outline-variant shrink-0">
+                     <img src={data.personalInfo.photo} alt="Photo" className="w-full h-full object-cover" />
+                   </div>
+                 )}
+                 <label className="flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant cursor-pointer hover:bg-surface-variant/30 transition-colors text-sm text-primary font-medium">
+                   <Icon name="add_a_photo" className="text-[18px]" />
+                   {data.personalInfo.photo ? t('common.uploadPhoto') : 'Add Photo'}
+                   <input
+                     type="file"
+                     accept="image/jpeg,image/png"
+                     className="hidden"
+                     onChange={(e) => {
+                       const file = e.target.files?.[0];
+                       if (!file || file.size > 2 * 1024 * 1024) return;
+                       const reader = new FileReader();
+                       reader.onload = (ev) => updatePersonalInfo({ photo: ev.target?.result as string });
+                       reader.readAsDataURL(file);
+                       e.target.value = '';
+                     }}
+                   />
+                 </label>
+                 {data.personalInfo.photo && (
+                   <button
+                     onClick={() => updatePersonalInfo({ photo: undefined })}
+                     className="text-sm text-error hover:underline"
+                   >
+                     Remove
+                   </button>
+                 )}
+               </div>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                 <InputField label={t('labels.email')} value={data.personalInfo.email} onChange={(v: any) => updatePersonalInfo({ email: v })} />
+                 <InputField label={t('labels.phone')} value={data.personalInfo.phone} onChange={(v: any) => updatePersonalInfo({ phone: v })} />
+               </div>
+               <InputField label={t('labels.address')} value={data.personalInfo.address} onChange={(v: any) => updatePersonalInfo({ address: v })} />
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                 <InputField label="LinkedIn" value={data.personalInfo.linkedin} onChange={(v: any) => updatePersonalInfo({ linkedin: v })} />
+                 <InputField label="GitHub" value={data.personalInfo.github} onChange={(v: any) => updatePersonalInfo({ github: v })} />
+                 <InputField label="Portfolio" value={data.personalInfo.portfolio} onChange={(v: any) => updatePersonalInfo({ portfolio: v })} />
+               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="font-label-small text-label-small text-primary">{t('sections.summary')}</label>
-                  <button
-                    onClick={() => handleRewrite('summary', data.personalInfo.summary, null, data.personalInfo.jobTitle)}
-                    disabled={rewriteState.id === null && rewriteState.loading}
-                    className="flex items-center gap-1 text-xs text-primary font-medium hover:underline"
-                  >
-                    {rewriteState.id === null && rewriteState.loading ? (
-                      <><div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div> Rewriting...</>
-                    ) : (
-                      <><Icon name="auto_awesome" className="text-[14px]" /> AI Rewrite</>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleRewrite('summary', data.personalInfo.summary, null, data.personalInfo.jobTitle)}
+                      disabled={rewriteState.id === null && rewriteState.loading}
+                      className="flex items-center gap-1 text-xs text-primary font-medium hover:underline"
+                    >
+                      {rewriteState.id === null && rewriteState.loading ? (
+                        <><div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div> Rewriting...</>
+                      ) : (
+                        <><Icon name="auto_awesome" className="text-[14px]" /> AI Rewrite</>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleGenerateSummary}
+                      disabled={generateSummaryLoading}
+                      className="flex items-center gap-1 text-xs text-secondary font-medium hover:underline"
+                    >
+                      {generateSummaryLoading ? (
+                        <><div className="w-3 h-3 border-2 border-secondary/30 border-t-secondary rounded-full animate-spin"></div> Generating...</>
+                      ) : (
+                        <><Icon name="auto_fix" className="text-[14px]" /> Generate</>
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <RichTextEditor
                   label=""
@@ -428,15 +607,15 @@ function App() {
                     <Icon name="delete" className="text-[18px]" />
                   </button>
                 </div>
-                <div className="p-5 space-y-5">
-                  <div className="grid grid-cols-2 gap-5">
-                    <InputField label={t('labels.company')} value={exp.company} onChange={(v: any) => updateExperience(exp.id, { company: v })} />
-                    <InputField label={t('labels.position')} value={exp.position} onChange={(v: any) => updateExperience(exp.id, { position: v })} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-5">
-                    <InputField label={t('labels.startDate')} value={exp.startDate} onChange={(v: any) => updateExperience(exp.id, { startDate: v })} />
-                    <InputField label={t('labels.endDate')} value={exp.endDate} onChange={(v: any) => updateExperience(exp.id, { endDate: v })} />
-                  </div>
+               <div className="p-4 sm:p-5 space-y-4 sm:space-y-5">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                     <InputField label={t('labels.company')} value={exp.company} onChange={(v: any) => updateExperience(exp.id, { company: v })} />
+                     <InputField label={t('labels.position')} value={exp.position} onChange={(v: any) => updateExperience(exp.id, { position: v })} />
+                   </div>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                     <InputField label={t('labels.startDate')} value={exp.startDate} onChange={(v: any) => updateExperience(exp.id, { startDate: v })} />
+                     <InputField label={t('labels.endDate')} value={exp.endDate} onChange={(v: any) => updateExperience(exp.id, { endDate: v })} />
+                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="font-label-small text-label-small text-primary">{t('labels.description')}</label>
@@ -539,13 +718,13 @@ function App() {
                     <Icon name="delete" className="text-[18px]" />
                   </button>
                 </div>
-                <div className="p-5 space-y-5">
-                  <InputField label={t('labels.school')} value={edu.school} onChange={(v: any) => updateEducation(edu.id, { school: v })} />
-                  <InputField label={t('labels.degree')} value={edu.degree} onChange={(v: any) => updateEducation(edu.id, { degree: v })} />
-                  <div className="grid grid-cols-2 gap-5">
-                    <InputField label={t('labels.startDate')} value={edu.startDate} onChange={(v: any) => updateEducation(edu.id, { startDate: v })} />
-                    <InputField label={t('labels.endDate')} value={edu.endDate} onChange={(v: any) => updateEducation(edu.id, { endDate: v })} />
-                  </div>
+               <div className="p-4 sm:p-5 space-y-4 sm:space-y-5">
+                   <InputField label={t('labels.school')} value={edu.school} onChange={(v: any) => updateEducation(edu.id, { school: v })} />
+                   <InputField label={t('labels.degree')} value={edu.degree} onChange={(v: any) => updateEducation(edu.id, { degree: v })} />
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                     <InputField label={t('labels.startDate')} value={edu.startDate} onChange={(v: any) => updateEducation(edu.id, { startDate: v })} />
+                     <InputField label={t('labels.endDate')} value={edu.endDate} onChange={(v: any) => updateEducation(edu.id, { endDate: v })} />
+                   </div>
                 </div>
               </div>
             ))}
@@ -570,34 +749,36 @@ function App() {
                 {sectionProgress.skillCount} skills
               </div>
             </div>
-            <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-5">
-              <form onSubmit={handleAddSkill} className="flex gap-2">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={newSkill}
-                    onChange={(e) => setNewSkill(e.target.value)}
-                    placeholder="E.g., React, UI Design..."
-                    className="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface"
-                  />
-                </div>
-                <button type="submit" className="px-6 rounded bg-primary text-on-primary font-title-md text-title-md hover:opacity-90 transition-opacity">
-                  <Icon name="add" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSuggestSkills}
-                  disabled={suggestSkillsLoading}
-                  className="px-4 rounded border border-primary text-primary font-medium hover:bg-primary/5 transition-colors flex items-center gap-1 text-sm"
-                >
-                  {suggestSkillsLoading ? (
-                    <><div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div></>
-                  ) : (
-                    <Icon name="auto_awesome" className="text-[18px]" />
-                  )}
-                  Suggest AI
-                </button>
-              </form>
+             <div className="bg-surface-container-lowest p-4 sm:p-6 rounded-lg border border-outline-variant shadow-sm space-y-4 sm:space-y-5">
+               <form onSubmit={handleAddSkill} className="flex flex-col sm:flex-row gap-2">
+                 <div className="flex-1 relative">
+                   <input
+                     type="text"
+                     value={newSkill}
+                     onChange={(e) => setNewSkill(e.target.value)}
+                     placeholder="E.g., React, UI Design..."
+                     className="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface"
+                   />
+                 </div>
+                 <div className="flex gap-2">
+                   <button type="submit" className="px-6 rounded bg-primary text-on-primary font-title-md text-title-md hover:opacity-90 transition-opacity">
+                     <Icon name="add" />
+                   </button>
+                   <button
+                     type="button"
+                     onClick={handleSuggestSkills}
+                     disabled={suggestSkillsLoading}
+                     className="px-4 rounded border border-primary text-primary font-medium hover:bg-primary/5 transition-colors flex items-center gap-1 text-sm"
+                   >
+                     {suggestSkillsLoading ? (
+                       <><div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div></>
+                     ) : (
+                       <Icon name="auto_awesome" className="text-[18px]" />
+                     )}
+                     <span className="hidden sm:inline">Suggest AI</span>
+                   </button>
+                 </div>
+               </form>
               <div className="flex flex-wrap gap-2">
                 {data.skills.map((skill, i) => (
                   <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-secondary-container text-on-secondary-container rounded-full text-sm font-medium">
@@ -666,11 +847,11 @@ function App() {
               </div>
             )}
 
-            {!aiState.loading && (
-              <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-6">
-                <div className="flex items-center gap-6 mb-4">
-                  <ScoreGauge value={aiResult.total} size={110} thickness={8} label="ATS Score" />
-                  <div className="flex-1 space-y-1.5">
+             {!aiState.loading && (
+               <div className="bg-surface-container-lowest p-4 sm:p-6 rounded-lg border border-outline-variant shadow-sm space-y-6">
+                 <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 mb-4">
+                   <ScoreGauge value={aiResult.total} size={110} thickness={8} label="ATS Score" />
+                   <div className="flex-1 w-full space-y-1.5">
                     {[
                       { key: t('analysis.breakdown.personal'), score: aiResult.breakdown.personal, max: 15 },
                       { key: t('analysis.breakdown.summary'), score: aiResult.breakdown.summary, max: 15 },
@@ -702,7 +883,7 @@ function App() {
                   </div>
                 )}
 
-                <div className="border-t border-outline-variant pt-4 grid grid-cols-3 gap-4">
+                <div className="border-t border-outline-variant pt-4 grid grid-cols-3 gap-2 sm:gap-4">
                   {[
                     { label: 'Contact', score: aiResult.details.contactCompleteness.score, max: aiResult.details.contactCompleteness.max, icon: 'contact_page' },
                     { label: 'Metrics', score: aiResult.details.quantifiableMetrics.score, max: aiResult.details.quantifiableMetrics.max, icon: 'bar_chart' },
@@ -760,32 +941,32 @@ function App() {
               <h2 className="font-headline-md text-headline-md text-on-surface mb-2">Job Match</h2>
               <p className="font-body-md text-body-md text-on-surface-variant">Paste a job description to see how your CV matches.</p>
             </div>
-            <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-5">
-              <textarea
-                value={jdText}
-                onChange={e => setJdText(e.target.value)}
-                placeholder="Paste job description here..."
-                rows={8}
-                className="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface resize-none"
-              />
-              <button
-                onClick={handleMatch}
-                disabled={matchLoading || !jdText.trim()}
-                className="w-full h-12 rounded-xl bg-primary text-on-primary font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {matchLoading ? (
-                  <><div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin"></div> Analyzing...</>
-                ) : (
-                  <><Icon name="search_insights" className="text-[20px]" /> Analyze Match</>
-                )}
-              </button>
-            </div>
+             <div className="bg-surface-container-lowest p-4 sm:p-6 rounded-lg border border-outline-variant shadow-sm space-y-4 sm:space-y-5">
+               <textarea
+                 value={jdText}
+                 onChange={e => setJdText(e.target.value)}
+                 placeholder="Paste job description here..."
+                 rows={8}
+                 className="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface resize-none"
+               />
+               <button
+                 onClick={handleMatch}
+                 disabled={matchLoading || !jdText.trim()}
+                 className="w-full h-12 rounded-xl bg-primary text-on-primary font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+               >
+                 {matchLoading ? (
+                   <><div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin"></div> Analyzing...</>
+                 ) : (
+                   <><Icon name="search_insights" className="text-[20px]" /> Analyze Match</>
+                 )}
+               </button>
+             </div>
 
-            {matchResult && (
-              <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-6">
-                <div className="flex items-center gap-6">
-                  <ScoreGauge value={matchResult.matchScore} max={100} size={100} thickness={7} label="% Match" />
-                  <div className="flex-1 space-y-1.5">
+             {matchResult && (
+               <div className="bg-surface-container-lowest p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm space-y-6">
+                 <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                   <ScoreGauge value={matchResult.matchScore} max={100} size={100} thickness={7} label="% Match" />
+                   <div className="flex-1 w-full space-y-1.5">
                     {[
                       { key: 'Keywords', score: matchResult.breakdown.keywords },
                       { key: 'Skills', score: matchResult.breakdown.skills },
@@ -894,6 +1075,18 @@ function App() {
             tags: ['Creative', 'Bold'],
             colors: ['#6b5778', '#f3daff', '#ffffff'],
             layout: 'asymmetric'
+          },
+          {
+            id: 'modern', name: 'The Modern Edge',
+            tags: ['Modern', '2-Column'],
+            colors: ['#2563eb', '#f8fafc', '#ffffff'],
+            layout: '2-col'
+          },
+          {
+            id: 'timeline', name: 'The Timeline Pro',
+            tags: ['Timeline', 'Chronological'],
+            colors: ['#059669', '#f0fdf4', '#ffffff'],
+            layout: 'centered'
           }
         ];
         return (
@@ -907,7 +1100,7 @@ function App() {
                 {currentTemplate === 'standard' ? 'Standard' : currentTemplate === 'executive' ? 'Executive' : currentTemplate === 'tech' ? 'Tech' : 'Creative'} selected
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-5">
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {templates.map(t => (
                 <button
                   key={t.id}
@@ -993,6 +1186,225 @@ function App() {
             </div>
           </div>
         );
+      case 'coverletter':
+        return (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <div>
+              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">Cover Letter</h2>
+              <p className="font-body-md text-body-md text-on-surface-variant">Generate AI-powered cover letters tailored to each job.</p>
+            </div>
+             <div className="bg-surface-container-lowest p-4 sm:p-6 rounded-lg border border-outline-variant shadow-sm space-y-4 sm:space-y-5">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 <InputField label="Company Name" value={coverLetterForm.companyName} onChange={(v: any) => setCoverLetterForm(f => ({ ...f, companyName: v }))} />
+                 <InputField label="Job Title (optional)" value={coverLetterForm.jobTitle} onChange={(v: any) => setCoverLetterForm(f => ({ ...f, jobTitle: v }))} />
+               </div>
+               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                 <label className="font-label-small text-label-small text-primary">Tone</label>
+                 <div className="flex gap-2">
+                   {(['professional', 'modern'] as const).map(tone => (
+                     <button
+                       key={tone}
+                       onClick={() => setCoverLetterForm(f => ({ ...f, tone }))}
+                       className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${coverLetterForm.tone === tone ? 'border-primary bg-primary-container/20 text-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary/50'}`}
+                     >
+                       {tone === 'professional' ? 'Professional' : 'Modern'}
+                     </button>
+                   ))}
+                 </div>
+               </div>
+              <button
+                onClick={handleGenerateCoverLetter}
+                disabled={clLoading || !coverLetterForm.companyName.trim()}
+                className="w-full h-12 rounded-xl bg-primary text-on-primary font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {clLoading ? (
+                  <><div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin"></div> Generating...</>
+                ) : (
+                  <><Icon name="auto_awesome" className="text-[20px]" /> Generate Cover Letter</>
+                )}
+              </button>
+            </div>
+             {clResult && (
+               <div className="bg-surface-container-lowest p-4 sm:p-6 rounded-xl border border-outline-variant shadow-sm">
+                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                   <h3 className="font-title-md text-title-md text-on-surface">Preview</h3>
+                   <div className="flex gap-2">
+                     <button
+                       onClick={() => {
+                         const blob = new Blob([clResult.body || ''], { type: 'text/plain' });
+                         const url = URL.createObjectURL(blob);
+                         const a = document.createElement('a');
+                         a.href = url;
+                         a.download = `Cover_Letter_${coverLetterForm.companyName.replace(/\s+/g, '_')}.txt`;
+                         a.click();
+                         URL.revokeObjectURL(url);
+                       }}
+                       className="px-4 py-2 rounded-lg border border-outline text-primary text-sm font-medium hover:bg-primary/5"
+                     >
+                       <Icon name="download" className="text-[14px]" /> Download
+                     </button>
+                   </div>
+                 </div>
+                 <div className="bg-white border border-outline-variant rounded-xl p-4 sm:p-6 w-full max-w-[650px] mx-auto">
+                   {clResult.subject && <div className="font-bold text-lg mb-3">{clResult.subject}</div>}
+                   <div className="text-sm leading-relaxed whitespace-pre-line text-on-surface">{clResult.body}</div>
+                   {clResult.salutation && <div className="mt-4 text-sm text-on-surface">{clResult.salutation}</div>}
+                 </div>
+               </div>
+             )}
+            {coverLetters.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-wider">Saved Cover Letters</h3>
+                {coverLetters.map(cl => (
+                  <div key={cl.id} className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-sm">{cl.companyName}</div>
+                      <div className="text-xs text-on-surface-variant">{cl.jobTitle || 'No title'} · {cl.tone} · {new Date(cl.createdAt).toLocaleDateString()}</div>
+                    </div>
+                    <button onClick={() => removeCoverLetter(cl.id)} className="text-on-surface-variant hover:text-error p-1">
+                      <Icon name="delete" className="text-[16px]" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      case 'jobtracker':
+        const statusColumns: { key: JobStatus; label: string; color: string; bg: string }[] = [
+          { key: 'saved', label: 'Saved', color: '#6366F1', bg: '#EEF2FF' },
+          { key: 'applied', label: 'Applied', color: '#F59E0B', bg: '#FFFBEB' },
+          { key: 'interview', label: 'Interview', color: '#10B981', bg: '#ECFDF5' },
+          { key: 'offer', label: 'Offer', color: '#8B5CF6', bg: '#F5F3FF' },
+          { key: 'rejected', label: 'Rejected', color: '#EF4444', bg: '#FEF2F2' },
+        ];
+        return (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div>
+              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">Job Tracker</h2>
+              <p className="font-body-md text-body-md text-on-surface-variant">Track your job applications in a Kanban board.</p>
+            </div>
+             <div className="bg-surface-container-lowest p-3 sm:p-4 rounded-xl border border-outline-variant shadow-sm">
+               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
+                 <input value={newJob.company} onChange={e => setNewJob(j => ({ ...j, company: e.target.value }))} placeholder="Company" className="flex-1 px-3 py-2 rounded border border-outline bg-transparent text-sm focus:border-primary focus:outline-none" />
+                 <input value={newJob.position} onChange={e => setNewJob(j => ({ ...j, position: e.target.value }))} placeholder="Position" className="flex-1 px-3 py-2 rounded border border-outline bg-transparent text-sm focus:border-primary focus:outline-none" />
+                 <input value={newJob.url} onChange={e => setNewJob(j => ({ ...j, url: e.target.value }))} placeholder="URL (optional)" className="flex-1 px-3 py-2 rounded border border-outline bg-transparent text-sm focus:border-primary focus:outline-none" />
+                 <button onClick={handleAddJob} className="px-4 py-2 rounded bg-primary text-on-primary text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-1">
+                   <Icon name="add" className="text-[18px]" />
+                   <span className="sm:hidden">Add</span>
+                 </button>
+               </div>
+             </div>
+             <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
+               {statusColumns.map(col => {
+                 const colJobs = jobs.filter(j => j.status === col.key);
+                 return (
+                   <div key={col.key} className="flex-1 min-w-[260px] sm:min-w-[200px] bg-surface-container-lowest rounded-xl border border-outline-variant p-3 snap-start">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: col.color }}></div>
+                      <span className="text-sm font-semibold text-on-surface">{col.label}</span>
+                      <span className="text-xs text-on-surface-variant ml-auto">{colJobs.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {colJobs.map(job => (
+                        <div key={job.id} className="bg-white rounded-lg border border-outline-variant p-3 group hover:shadow-sm transition-shadow">
+                          <div className="font-medium text-sm text-on-surface">{job.position}</div>
+                          <div className="text-xs text-on-surface-variant mt-0.5">{job.company}</div>
+                          {job.url && <a href={job.url} target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline mt-1 block truncate">{job.url}</a>}
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-outline-variant/30">
+                            <span className="text-[9px] text-on-surface-variant">{new Date(job.updatedAt).toLocaleDateString()}</span>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {statusColumns.filter(c => c.key !== col.key).map(c => (
+                                <button key={c.key} onClick={() => moveJob(job.id, c.key)} title={`Move to ${c.label}`} className="w-4 h-4 rounded-full hover:scale-110 transition-transform" style={{ backgroundColor: c.color }}></button>
+                              ))}
+                              <button onClick={() => removeJob(job.id)} className="text-[10px] text-error hover:underline">✕</button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {colJobs.length === 0 && (
+                        <div className="text-xs text-on-surface-variant/50 text-center py-6">No jobs</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      case 'pricing':
+        const tiers = [
+          { id: 'free', name: 'Free', price: '$0', description: 'Get started with basic features', features: ['1 CV', '5 AI analyses/month', '2 templates', 'PDF with watermark'] },
+          { id: 'pro', name: 'Pro', price: '$7.99', period: '/month', description: 'For serious job seekers', features: ['Unlimited CVs', 'Unlimited AI analyses', 'All 4 templates', 'Clean PDF export', 'JD Matching', 'JSON export', 'Priority support'], popular: true },
+          { id: 'business', name: 'Business', price: '$14.99', period: '/month', description: 'For professionals & teams', features: ['Everything in Pro', '10+ templates', 'Priority AI', 'Cover letter builder', 'Team sharing'], popular: false },
+          { id: 'lifetime', name: 'Lifetime', price: '$129', period: ' once', description: 'Pay once, own forever', features: ['Everything in Pro', 'All future updates', 'Lifetime access', 'Premium templates'], popular: false },
+        ];
+        return (
+          <div className="space-y-8 animate-in fade-in duration-300 max-w-6xl mx-auto">
+            <div>
+              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">Upgrade Your Plan</h2>
+              <p className="font-body-md text-body-md text-on-surface-variant">Choose the plan that fits your needs.</p>
+            </div>
+             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant">
+               <div className="flex items-center gap-2 text-sm">
+                 <Icon name="bar_chart" className="text-[18px] text-primary" />
+                 <span className="text-on-surface-variant">AI Usage:</span>
+                 <span className="font-bold text-on-surface">{usageCount} calls</span>
+                 <span className="text-on-surface-variant">/ month</span>
+               </div>
+               <div className="flex-1 h-2 bg-surface-variant rounded-full w-full sm:max-w-[200px]">
+                 <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min((usageCount / 5) * 100, 100)}%` }}></div>
+               </div>
+               {userTier === 'free' && usageCount >= 5 && (
+                 <button onClick={() => setActiveTab('pricing')} className="text-xs text-primary font-medium hover:underline">
+                   Upgrade to continue
+                 </button>
+               )}
+             </div>
+             <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+              {tiers.map(tier => {
+                const isCurrent = userTier === tier.id;
+                return (
+                  <div key={tier.id} className={`relative rounded-2xl overflow-hidden ${tier.popular ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface bg-gradient-to-b from-primary/5 to-transparent' : 'bg-surface-container-lowest border border-outline-variant'}`}>
+                    {tier.popular && <div className="bg-primary text-on-primary text-[10px] font-bold text-center py-1.5 uppercase tracking-widest">Most Popular</div>}
+                    <div className="p-6 space-y-5">
+                      <div>
+                        <h3 className="font-title-md text-title-md text-on-surface">{tier.name}</h3>
+                        <div className="mt-3 flex items-baseline gap-1">
+                          <span className="text-4xl font-bold text-on-surface">{tier.price}</span>
+                          {tier.period && <span className="text-sm text-on-surface-variant">{tier.period}</span>}
+                        </div>
+                        <p className="text-xs text-on-surface-variant mt-2">{tier.description}</p>
+                      </div>
+                      <ul className="space-y-3">
+                        {tier.features.map((f, i) => (
+                          <li key={i} className="flex items-start gap-2.5 text-xs text-on-surface">
+                            <Icon name="check_circle" className="text-[16px] text-[#14B8A6] shrink-0 mt-0.5" /> {f}
+                          </li>
+                        ))}
+                      </ul>
+                      {isCurrent ? (
+                        <div className="w-full py-3 rounded-xl bg-surface-variant text-on-surface-variant text-sm font-semibold text-center">
+                          Current Plan
+                        </div>
+                      ) : tier.id === 'free' ? (
+                        <div className="text-xs text-on-surface-variant text-center py-3 font-medium">Always free</div>
+                      ) : (
+                        <button
+                          onClick={() => handleUpgrade(tier.id)}
+                          className={`w-full py-3 rounded-xl text-sm font-semibold transition-all ${tier.popular ? 'bg-primary text-on-primary hover:bg-primary/90 shadow-lg shadow-primary/20' : 'border-2 border-primary text-primary hover:bg-primary/5'}`}
+                        >
+                          {userTier === 'free' ? 'Upgrade' : 'Switch Plan'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
       case 'settings':
         return (
           <div className="space-y-8 animate-in fade-in duration-300">
@@ -1000,53 +1412,107 @@ function App() {
               <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.settings')}</h2>
               <p className="font-body-md text-body-md text-on-surface-variant">Customize your CV appearance and manage data.</p>
             </div>
-            <div className="bg-surface-container-lowest p-6 rounded-lg border border-outline-variant shadow-sm space-y-8">
-              <div>
-                <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">{t('labels.color')}</h3>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="color"
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="w-12 h-12 rounded-lg border border-outline-variant cursor-pointer"
-                  />
-                  <span className="text-sm text-on-surface-variant font-mono">{primaryColor}</span>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">{t('labels.font')}</h3>
-                <div className="flex gap-2">
-                  {(['sans', 'serif', 'mono'] as const).map((f) => (
+             <div className="bg-surface-container-lowest p-4 sm:p-6 rounded-lg border border-outline-variant shadow-sm space-y-6 sm:space-y-8">
+               <div>
+                 <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">{t('labels.color')}</h3>
+                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                   <input
+                     type="color"
+                     value={primaryColor}
+                     onChange={(e) => setPrimaryColor(e.target.value)}
+                     className="w-12 h-12 rounded-lg border border-outline-variant cursor-pointer"
+                   />
+                   <span className="text-sm text-on-surface-variant font-mono">{primaryColor}</span>
+                 </div>
+               </div>
+               <div>
+                 <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">{t('labels.font')}</h3>
+                 <div className="flex flex-wrap gap-2">
+                   {(['sans', 'serif', 'mono'] as const).map((f) => (
+                     <button
+                       key={f}
+                       onClick={() => setFontFamily(f)}
+                       className={`px-4 sm:px-6 py-3 rounded-lg border text-sm font-medium transition-all ${
+                         fontFamily === f
+                           ? 'border-primary bg-primary-container/20 text-primary ring-2 ring-primary/20'
+                           : 'border-outline-variant text-on-surface-variant hover:border-primary/50'
+                       }`}
+                     >
+                       {f.charAt(0).toUpperCase() + f.slice(1)}
+                     </button>
+                   ))}
+                 </div>
+               </div>
+               <div>
+                 <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">{t('labels.dataManagement')}</h3>
+                 <p className="text-sm text-on-surface-variant mb-4">{t('labels.tip')}</p>
+                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                   <button
+                     onClick={() => {
+                       if (window.confirm(t('common.confirmReset'))) {
+                         resetData();
+                       }
+                     }}
+                     className="px-5 py-2.5 rounded-xl border border-error text-error text-sm font-medium hover:bg-error-container/20 transition-colors flex items-center gap-2 w-full sm:w-auto justify-center"
+                   >
+                     <Icon name="delete_forever" className="text-[18px]" />
+                     {t('common.reset')}
+                   </button>
+                   <span className="text-[10px] text-on-surface-variant">This action cannot be undone</span>
+                 </div>
+               </div>
+               <div className="border-t border-outline-variant pt-6">
+                 <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">LinkedIn Import</h3>
+                 <p className="text-sm text-on-surface-variant mb-3">Paste text from a LinkedIn profile or PDF export to auto-fill your CV.</p>
+                 <textarea
+                   value={linkedinImportText}
+                   onChange={e => setLinkedinImportText(e.target.value)}
+                   placeholder="Paste LinkedIn profile text here..."
+                   rows={5}
+                   className="w-full px-4 py-3 rounded border border-outline bg-transparent focus:border-primary focus:border-2 focus:outline-none font-body-md text-body-md text-on-surface resize-none text-sm"
+                 />
+                 <button
+                   onClick={handleLinkedInImport}
+                   disabled={linkedinImportLoading || !linkedinImportText.trim()}
+                   className="mt-3 px-6 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 w-full sm:w-auto justify-center"
+                 >
+                   {linkedinImportLoading ? (
+                     <><div className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin"></div> Importing...</>
+                   ) : (
+                     <><Icon name="download" className="text-[18px]" /> Import from Text</>
+                   )}
+                 </button>
+               </div>
+              <div className="border-t border-outline-variant pt-6">
+                <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">Language</h3>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { code: 'en', name: 'English' },
+                    { code: 'vi', name: 'Tiếng Việt' },
+                    { code: 'ja', name: '日本語' },
+                    { code: 'ko', name: '한국어' },
+                    { code: 'zh', name: '中文' },
+                    { code: 'es', name: 'Español' },
+                    { code: 'fr', name: 'Français' },
+                    { code: 'de', name: 'Deutsch' },
+                  ].map(lang => (
                     <button
-                      key={f}
-                      onClick={() => setFontFamily(f)}
-                      className={`px-6 py-3 rounded-lg border text-sm font-medium transition-all ${
-                        fontFamily === f
-                          ? 'border-primary bg-primary-container/20 text-primary ring-2 ring-primary/20'
+                      key={lang.code}
+                      onClick={() => {
+                        if (language !== lang.code) {
+                          setLanguage(lang.code as any);
+                          i18n.changeLanguage(lang.code as any);
+                        }
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
+                        language === lang.code
+                          ? 'border-primary bg-primary-container/20 text-primary'
                           : 'border-outline-variant text-on-surface-variant hover:border-primary/50'
                       }`}
                     >
-                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                      {lang.name}
                     </button>
                   ))}
-                </div>
-              </div>
-              <div>
-                <h3 className="font-label-small text-label-small uppercase tracking-widest text-on-surface-variant mb-4">{t('labels.dataManagement')}</h3>
-                <p className="text-sm text-on-surface-variant mb-4">{t('labels.tip')}</p>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => {
-                      if (window.confirm(t('common.confirmReset'))) {
-                        resetData();
-                      }
-                    }}
-                    className="px-5 py-2.5 rounded-xl border border-error text-error text-sm font-medium hover:bg-error-container/20 transition-colors flex items-center gap-2"
-                  >
-                    <Icon name="delete_forever" className="text-[18px]" />
-                    {t('common.reset')}
-                  </button>
-                  <span className="text-[10px] text-on-surface-variant">This action cannot be undone</span>
                 </div>
               </div>
             </div>
@@ -1057,18 +1523,108 @@ function App() {
     }
   };
 
-  return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md overflow-hidden">
-      {/* TopAppBar */}
-      <header className="h-[72px] bg-surface flex items-center justify-between px-6 border-b border-surface-variant shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="text-primary font-bold text-xl tracking-tight flex items-center gap-1">
-            SwiftCv
+   return (
+     <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md overflow-hidden">
+       {/* AI Error Toast */}
+       {aiErrorToast && (
+         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full mx-4 animate-in fade-in slide-in-from-top-4 duration-300">
+           <div className="bg-error-container border border-error-container rounded-xl shadow-lg p-4 flex items-start gap-3">
+             <div className="w-8 h-8 rounded-full bg-error-container/50 flex items-center justify-center shrink-0 mt-0.5">
+               <Icon name="error" className="text-[18px] text-error" />
+             </div>
+             <div className="flex-1 min-w-0">
+               <p className="text-sm font-medium text-on-error-container">{aiErrorToast}</p>
+               <p className="text-xs text-on-error-container/70 mt-1">Kiểm tra API key trong .env hoặc thử lại sau.</p>
+             </div>
+             <button onClick={() => setAiErrorToast(null)} className="text-on-error-container/60 hover:text-on-error-container shrink-0">
+               <Icon name="close" className="text-[18px]" />
+             </button>
+           </div>
+         </div>
+       )}
+       {/* TopAppBar */}
+      <header className="h-[64px] sm:h-[72px] bg-surface flex items-center justify-between px-3 sm:px-4 border-b border-surface-variant shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="text-primary font-bold text-lg sm:text-xl tracking-tight shrink-0">SwiftCv</div>
+          <div className="w-px h-5 sm:h-6 bg-surface-variant hidden sm:block"></div>
+          <div className="relative hidden sm:block">
+            <button
+              onClick={() => setShowCvMenu(!showCvMenu)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-surface-variant/50 transition-colors text-sm font-medium text-on-surface"
+            >
+              <Icon name="description" className="text-[18px] text-primary" />
+              <span className="max-w-[120px] truncate">{cvs.find(c => c.id === currentCvId)?.name || 'My CV'}</span>
+              <Icon name="expand_more" className="text-[16px] text-on-surface-variant" />
+            </button>
+            {showCvMenu && (
+              <div className="absolute top-full left-0 mt-1 w-64 bg-surface border border-outline-variant rounded-xl shadow-xl z-50 py-2 max-h-64 overflow-y-auto">
+                {cvs.map(cv => (
+                  <div key={cv.id} className="flex items-center gap-1 px-3 py-2 hover:bg-surface-variant/50 group">
+                    {renamingCv === cv.id ? (
+                      <input
+                        value={renameValue}
+                        onChange={e => setRenameValue(e.target.value)}
+                        onBlur={() => handleFinishRename(cv.id)}
+                        onKeyDown={e => e.key === 'Enter' && handleFinishRename(cv.id)}
+                        className="flex-1 text-sm px-2 py-0.5 rounded border border-outline bg-transparent focus:border-primary focus:outline-none"
+                        autoFocus
+                      />
+                    ) : (
+                      <button
+                        onClick={() => { switchCV(cv.id); setShowCvMenu(false); }}
+                        className={`flex-1 text-left text-sm ${currentCvId === cv.id ? 'font-bold text-primary' : 'text-on-surface'}`}
+                      >
+                        {cv.name}
+                      </button>
+                    )}
+                    {currentCvId === cv.id && <Icon name="check" className="text-[14px] text-primary shrink-0" />}
+                    <button onClick={() => handleStartRename(cv.id, cv.name)} className="opacity-0 group-hover:opacity-100 text-[12px] text-on-surface-variant hover:text-primary p-0.5">
+                      <Icon name="edit" className="text-[14px]" />
+                    </button>
+                    {cvs.length > 1 && (
+                      <button onClick={() => handleDeleteCV(cv.id)} className="opacity-0 group-hover:opacity-100 text-[12px] text-on-surface-variant hover:text-error p-0.5">
+                        <Icon name="delete" className="text-[14px]" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div className="border-t border-outline-variant my-1"></div>
+                <button onClick={handleCreateCV} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-surface-variant/50">
+                  <Icon name="add" className="text-[16px]" /> New CV
+                </button>
+              </div>
+            )}
           </div>
-          <div className="w-px h-6 bg-surface-variant"></div>
-          <span className="text-on-surface-variant font-medium">{t(`templates.${currentTemplate}.name`)}</span>
+          {/* Mobile CV selector */}
+          <button
+            onClick={() => setShowCvMenu(!showCvMenu)}
+            className="sm:hidden flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-surface-variant/50 transition-colors text-xs font-medium text-on-surface"
+          >
+            <Icon name="description" className="text-[16px] text-primary" />
+            <span className="max-w-[80px] truncate">{cvs.find(c => c.id === currentCvId)?.name || 'My CV'}</span>
+            <Icon name="expand_more" className="text-[14px] text-on-surface-variant" />
+          </button>
+          {showCvMenu && (
+            <div className="sm:hidden absolute top-[64px] left-0 right-0 mt-1 mx-3 w-auto bg-surface border border-outline-variant rounded-xl shadow-xl z-50 py-2 max-h-64 overflow-y-auto">
+              {cvs.map(cv => (
+                <div key={cv.id} className="flex items-center gap-1 px-3 py-2 hover:bg-surface-variant/50">
+                  <button
+                    onClick={() => { switchCV(cv.id); setShowCvMenu(false); }}
+                    className={`flex-1 text-left text-sm ${currentCvId === cv.id ? 'font-bold text-primary' : 'text-on-surface'}`}
+                  >
+                    {cv.name}
+                  </button>
+                  {currentCvId === cv.id && <Icon name="check" className="text-[14px] text-primary shrink-0" />}
+                </div>
+              ))}
+              <div className="border-t border-outline-variant my-1"></div>
+              <button onClick={handleCreateCV} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-surface-variant/50">
+                <Icon name="add" className="text-[16px]" /> New CV
+              </button>
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -1076,15 +1632,57 @@ function App() {
             onChange={handleImportJSON}
             className="hidden"
           />
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="sm:hidden h-9 w-9 rounded-full border border-outline flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 transition-colors"
+          >
+            <Icon name={showMobileMenu ? "close" : "more_vert"} className="text-[20px]" />
+          </button>
+          {/* Mobile dropdown menu */}
+          {showMobileMenu && (
+            <div className="sm:hidden absolute top-[64px] right-3 w-48 bg-surface border border-outline-variant rounded-xl shadow-xl z-50 py-2">
+              <button
+                onClick={() => { fileInputRef.current?.click(); setShowMobileMenu(false); }}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-surface-variant/50"
+              >
+                <Icon name="upload_file" className="text-[18px] text-primary" /> Import JSON
+              </button>
+              <button
+                onClick={() => { handleExportJSON(); setShowMobileMenu(false); }}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-surface-variant/50"
+              >
+                <Icon name="download" className="text-[18px] text-primary" /> Export JSON
+              </button>
+              <button 
+                onClick={() => {
+                  const newLang = language === 'en' ? 'vi' : 'en';
+                  setLanguage(newLang);
+                  i18n.changeLanguage(newLang);
+                  setShowMobileMenu(false);
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-surface-variant/50 uppercase"
+              >
+                <Icon name="language" className="text-[18px] text-primary" /> {language}
+              </button>
+              <button
+                onClick={() => { setActiveTab('pricing'); setShowMobileMenu(false); }}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-amber-700 hover:bg-surface-variant/50"
+              >
+                <Icon name="workspace_premium" className="text-[18px]" /> {userTier === 'free' ? 'Upgrade' : 'Plan'}
+              </button>
+            </div>
+          )}
+          {/* Desktop buttons */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="h-10 px-4 rounded-full border border-outline text-primary font-medium hover:bg-primary/5 transition-colors text-sm"
+            className="hidden sm:flex items-center h-10 px-4 rounded-full border border-outline text-primary font-medium hover:bg-primary/5 transition-colors text-sm"
           >
             {t('common.import')}
           </button>
           <button
             onClick={handleExportJSON}
-            className="h-10 px-4 rounded-full border border-outline text-primary font-medium hover:bg-primary/5 transition-colors text-sm"
+            className="hidden sm:flex items-center h-10 px-4 rounded-full border border-outline text-primary font-medium hover:bg-primary/5 transition-colors text-sm"
           >
             {t('common.export')}
           </button>
@@ -1094,13 +1692,29 @@ function App() {
               setLanguage(newLang);
               i18n.changeLanguage(newLang);
             }}
-            className="h-10 px-6 rounded-full border border-outline text-primary font-medium hover:bg-primary/5 transition-colors uppercase"
+            className="hidden sm:flex items-center h-10 px-4 sm:px-6 rounded-full border border-outline text-primary font-medium hover:bg-primary/5 transition-colors uppercase text-sm"
           >
             {language}
           </button>
+          {userTier !== 'free' && (
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs font-medium text-amber-700">
+              <Icon name="workspace_premium" className="text-[14px]" />
+              {userTier.charAt(0).toUpperCase() + userTier.slice(1)}
+            </div>
+          )}
+          <button
+            onClick={() => setActiveTab('pricing')}
+            className="hidden sm:flex h-10 px-4 rounded-full border border-amber-300 bg-amber-50 text-amber-700 font-medium hover:bg-amber-100 transition-colors text-sm items-center gap-1"
+          >
+            <Icon name="workspace_premium" className="text-[16px]" />
+            {userTier === 'free' ? 'Upgrade' : 'Plan'}
+          </button>
+          <button className="hidden sm:flex h-10 w-10 rounded-full border border-outline items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 transition-colors" title="Sign in">
+            <Icon name="account_circle" className="text-[20px]" />
+          </button>
           <button
             onClick={() => setShowPreview(!showPreview)}
-            className="md:hidden h-10 w-10 rounded-full border border-outline text-primary flex items-center justify-center hover:bg-primary/5 transition-colors"
+            className="sm:hidden h-9 w-9 rounded-full border border-outline text-primary flex items-center justify-center hover:bg-primary/5 transition-colors"
             title={showPreview ? 'Hide preview' : 'Show preview'}
           >
             <Icon name="visibility" className="text-[20px]" filled={showPreview} />
@@ -1108,17 +1722,18 @@ function App() {
           <button 
             onClick={handlePrint}
             disabled={isDownloading}
-            className={`h-10 px-6 rounded-full bg-primary text-on-primary font-medium transition-colors shadow-sm flex items-center justify-center gap-2 ${
+            className={`h-9 sm:h-10 px-3 sm:px-6 rounded-full bg-primary text-on-primary font-medium transition-colors shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm ${
               isDownloading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary/90'
             }`}
           >
             {isDownloading ? (
               <>
-                <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
-                Downloading...
+                <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
+                <span className="hidden sm:inline">Downloading...</span>
+                <span className="sm:hidden">PDF</span>
               </>
             ) : (
-              'Download PDF'
+              <><span className="hidden sm:inline">Download PDF</span><span className="sm:hidden">PDF</span></>
             )}
           </button>
         </div>
@@ -1129,18 +1744,18 @@ function App() {
         {/* Full-screen Loading Overlay */}
         {isDownloading && (
           <div className="absolute inset-0 z-50 bg-surface/80 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200">
-            <div className="bg-surface-container p-8 rounded-2xl shadow-xl flex flex-col items-center max-w-sm text-center">
-              <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-6"></div>
-              <h3 className="text-xl font-headline-md text-on-surface mb-2">Generating PDF...</h3>
-              <p className="text-body-md text-on-surface-variant">Please wait a moment while we prepare your high-quality resume. This may take a few seconds.</p>
+            <div className="bg-surface-container p-6 sm:p-8 rounded-2xl shadow-xl flex flex-col items-center max-w-sm mx-4 text-center">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4 sm:mb-6"></div>
+              <h3 className="text-lg sm:text-xl font-headline-md text-on-surface mb-2">Generating PDF...</h3>
+              <p className="text-sm sm:text-body-md text-on-surface-variant">Please wait a moment while we prepare your high-quality resume.</p>
             </div>
           </div>
         )}
 
-        {/* Left Panel: Editor (40%) */}
-        <section className="w-full md:w-[40%] bg-surface flex border-r border-outline-variant h-full overflow-hidden shrink-0">
-          {/* Vertical Sidebar */}
-          <nav className="w-16 lg:w-20 shrink-0 bg-surface-container-low border-r border-outline-variant flex flex-col items-center py-3 gap-0.5 overflow-y-auto no-scrollbar">
+        {/* Left Panel: Editor */}
+        <section className={`bg-surface flex border-r border-outline-variant h-full overflow-hidden shrink-0 ${activeTab === 'pricing' ? 'w-full' : 'w-full md:w-[40%] lg:w-[45%]'}`}>
+          {/* Vertical Sidebar - Desktop */}
+          <nav className="hidden sm:flex w-16 lg:w-20 shrink-0 bg-surface-container-low border-r border-outline-variant flex-col items-center py-3 gap-0.5 overflow-y-auto no-scrollbar">
             {formTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -1174,41 +1789,76 @@ function App() {
             ))}
           </nav>
           
+          {/* Mobile Bottom Navigation */}
+          <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-container-low border-t border-outline-variant flex items-center justify-around py-1 px-1 safe-area-bottom">
+            {formTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex-1 py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
+                  activeTab === tab.id 
+                    ? 'bg-primary-container/30 text-primary' 
+                    : 'text-on-surface-variant'
+                }`}
+              >
+                <Icon name={tab.icon} className="text-[20px]" filled={activeTab === tab.id} />
+                <span className="text-[9px] font-medium leading-tight">{tab.short}</span>
+              </button>
+            ))}
+            <div className="w-px h-6 bg-outline-variant/50 mx-1"></div>
+            {toolTabs.slice(0, 3).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex-1 py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
+                  activeTab === tab.id 
+                    ? 'bg-primary-container/30 text-primary' 
+                    : 'text-on-surface-variant'
+                }`}
+              >
+                <Icon name={tab.icon} className="text-[20px]" filled={activeTab === tab.id} />
+                <span className="text-[9px] font-medium leading-tight">{tab.short}</span>
+              </button>
+            ))}
+          </nav>
+          
           {/* Editor Content Area */}
-          <div className="flex-1 overflow-y-auto p-6 lg:p-8 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar pb-20 sm:pb-6">
             {renderTabContent()}
           </div>
         </section>
 
-        {/* Right Panel: Canvas Preview (60%) */}
-        <section className={`flex-col w-[60%] bg-surface-container-low p-8 overflow-y-auto items-center custom-scrollbar ${showPreview ? 'flex absolute inset-0 z-40 md:relative' : 'hidden md:flex'}`}>
+        {/* Right Panel: Canvas Preview */}
+        <section className={`flex-col bg-surface-container-low p-4 sm:p-6 md:p-8 overflow-y-auto items-center custom-scrollbar ${activeTab === 'pricing' ? 'hidden' : ''} ${showPreview ? 'flex absolute inset-0 z-40 md:relative md:inset-auto' : 'hidden md:flex'} ${activeTab !== 'pricing' ? 'w-full md:w-[60%] lg:w-[55%]' : ''}`}>
           {/* Canvas Toolbar */}
-          <div className="w-full max-w-[850px] flex justify-between items-center mb-6 no-print">
+          <div className="w-full max-w-[850px] flex justify-between items-center mb-4 sm:mb-6 no-print">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowPreview(false)}
-                className="md:hidden h-10 w-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 transition-colors"
+                className="md:hidden h-9 w-9 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 transition-colors"
               >
-                <Icon name="close" className="text-[20px]" />
+                <Icon name="close" className="text-[18px]" />
               </button>
-              <div className="flex items-center gap-2 bg-surface px-3 py-1.5 rounded-full border border-surface-variant shadow-sm">
-                <span className="w-2 h-2 rounded-full bg-[#14B8A6]"></span>
-                <span className="text-xs font-medium text-on-surface-variant">Auto-saved</span>
+              <div className="flex items-center gap-2 bg-surface px-2 sm:px-3 py-1.5 rounded-full border border-surface-variant shadow-sm">
+                <span className={`w-2 h-2 rounded-full ${syncStatus === 'synced' ? 'bg-[#14B8A6]' : syncStatus === 'syncing' ? 'bg-[#F59E0B] animate-pulse' : syncStatus === 'error' ? 'bg-[#EF4444]' : 'bg-[#94A3B8]'}`}></span>
+                <span className="text-[10px] sm:text-xs font-medium text-on-surface-variant">
+                  {syncStatus === 'synced' ? 'Cloud saved' : syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Sync error' : 'Offline'}
+                </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.1))}
-                className="w-10 h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors"
               >
-                <Icon name="zoom_out" className="text-[20px]" />
+                <Icon name="zoom_out" className="text-[16px] sm:text-[20px]" />
               </button>
-              <span className="font-label-small text-label-small text-on-surface-variant w-12 text-center">{Math.round(zoomLevel * 100)}%</span>
+              <span className="font-label-small text-label-small text-on-surface-variant w-10 sm:w-12 text-center text-xs sm:text-sm">{Math.round(zoomLevel * 100)}%</span>
               <button
                 onClick={() => setZoomLevel(Math.min(1.5, zoomLevel + 0.1))}
-                className="w-10 h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors"
               >
-                <Icon name="zoom_in" className="text-[20px]" />
+                <Icon name="zoom_in" className="text-[16px] sm:text-[20px]" />
               </button>
             </div>
           </div>
@@ -1223,8 +1873,10 @@ function App() {
             {currentTemplate === 'executive' && <MinimalistTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
             {currentTemplate === 'tech' && <PixelsTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
             {currentTemplate === 'creative' && <CreativeTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'modern' && <ModernTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'timeline' && <TimelineTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
           </div>
-          <div className="h-16 w-full shrink-0 no-print"></div>
+          <div className="h-12 sm:h-16 w-full shrink-0 no-print"></div>
         </section>
       </main>
     </div>

@@ -37,16 +37,55 @@ export interface CVData {
   skills: string[];
 }
 
-export type TemplateType = 'executive' | 'tech' | 'creative' | 'standard';
+export type TemplateType = 'executive' | 'tech' | 'creative' | 'standard' | 'modern' | 'timeline';
 export type FontType = 'sans' | 'serif' | 'mono';
+export type UserTier = 'free' | 'pro' | 'business' | 'lifetime';
+
+export interface CVProject {
+  id: string;
+  name: string;
+  data: CVData;
+  template: TemplateType;
+  primaryColor: string;
+  fontFamily: FontType;
+  updatedAt: string;
+}
+
+export interface CoverLetter {
+  id: string;
+  companyName: string;
+  jobTitle: string;
+  content: string;
+  tone: 'professional' | 'modern';
+  createdAt: string;
+}
+
+export type JobStatus = 'saved' | 'applied' | 'interview' | 'offer' | 'rejected';
+
+export interface JobEntry {
+  id: string;
+  company: string;
+  position: string;
+  url: string;
+  status: JobStatus;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface CVStore {
   data: CVData;
-  language: 'en' | 'vi';
+  language: 'en' | 'vi' | 'ja' | 'ko' | 'zh' | 'es' | 'fr' | 'de';
   currentTemplate: TemplateType;
   primaryColor: string;
   fontFamily: FontType;
-  setLanguage: (lang: 'en' | 'vi') => void;
+  cvs: CVProject[];
+  currentCvId: string;
+  coverLetters: CoverLetter[];
+  jobs: JobEntry[];
+  userTier: UserTier;
+  usageCount: number;
+  setLanguage: (lang: 'en' | 'vi' | 'ja' | 'ko' | 'zh' | 'es' | 'fr' | 'de') => void;
   setTemplate: (template: TemplateType) => void;
   setPrimaryColor: (color: string) => void;
   setFontFamily: (font: FontType) => void;
@@ -62,6 +101,21 @@ interface CVStore {
   removeSkill: (skill: string) => void;
   resetData: () => void;
   importData: (data: CVData) => void;
+  createCV: (name: string) => void;
+  switchCV: (id: string) => void;
+  deleteCV: (id: string) => void;
+  renameCV: (id: string, name: string) => void;
+  addCoverLetter: (cl: CoverLetter) => void;
+  updateCoverLetter: (id: string, data: Partial<CoverLetter>) => void;
+  removeCoverLetter: (id: string) => void;
+  addJob: (job: Omit<JobEntry, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateJob: (id: string, data: Partial<JobEntry>) => void;
+  removeJob: (id: string) => void;
+  moveJob: (id: string, status: JobStatus) => void;
+  incrementUsage: () => void;
+  setUserTier: (tier: UserTier) => void;
+  syncCVToCloud: () => Promise<void>;
+  loadCVFromCloud: () => Promise<CVProject | null>;
 }
 
 const initialData: CVData = {
@@ -113,97 +167,265 @@ const initialData: CVData = {
   skills: ['Strategic Planning', 'Global Operations', 'Mergers & Acquisitions', 'Innovation Management', 'Fiscal Responsibility'],
 };
 
+const now = () => new Date().toISOString();
+
 export const useCVStore = create<CVStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       data: initialData,
       language: 'en',
       currentTemplate: 'executive',
       primaryColor: '#0061a4',
-
       fontFamily: 'sans',
+      cvs: [],
+      currentCvId: '',
+      coverLetters: [],
+      jobs: [],
+      userTier: 'free',
+      usageCount: 0,
+
       setLanguage: (lang) => set({ language: lang }),
-      setTemplate: (template) => set({ currentTemplate: template }),
-      setPrimaryColor: (color) => set({ primaryColor: color }),
-      setFontFamily: (font) => set({ fontFamily: font }),
-      updatePersonalInfo: (info) =>
-        set((state) => ({
-          data: { ...state.data, personalInfo: { ...state.data.personalInfo, ...info } },
-        })),
-      addExperience: () =>
-        set((state) => ({
-          data: {
-            ...state.data,
-            experiences: [
-              ...state.data.experiences,
-              { id: uuidv4(), company: '', position: '', startDate: '', endDate: '', bulletPoints: '' },
-            ],
-          },
-        })),
-      updateExperience: (id, updatedExp) =>
-        set((state) => ({
-          data: {
-            ...state.data,
-            experiences: state.data.experiences.map((exp) =>
-              exp.id === id ? { ...exp, ...updatedExp } : exp
-            ),
-          },
-        })),
-      removeExperience: (id) =>
-        set((state) => ({
-          data: {
-            ...state.data,
-            experiences: state.data.experiences.filter((exp) => exp.id !== id),
-          },
-        })),
-      addEducation: () =>
-        set((state) => ({
-          data: {
-            ...state.data,
-            educations: [
-              ...state.data.educations,
-              { id: uuidv4(), school: '', degree: '', startDate: '', endDate: '' },
-            ],
-          },
-        })),
-      updateEducation: (id, updatedEdu) =>
-        set((state) => ({
-          data: {
-            ...state.data,
-            educations: state.data.educations.map((edu) =>
-              edu.id === id ? { ...edu, ...updatedEdu } : edu
-            ),
-          },
-        })),
-      removeEducation: (id) =>
-        set((state) => ({
-          data: {
-            ...state.data,
-            educations: state.data.educations.filter((edu) => edu.id !== id),
-          },
-        })),
-      updateSkills: (skills) =>
-        set((state) => ({
-          data: { ...state.data, skills },
-        })),
-      addSkill: (skill) =>
-        set((state) => ({
-          data: { ...state.data, skills: [...state.data.skills, skill] },
-        })),
-      removeSkill: (skill) =>
-        set((state) => ({
-          data: { ...state.data, skills: state.data.skills.filter(s => s !== skill) },
-        })),
-      resetData: () => set({ data: initialData }),
-      importData: (data) => set({ data }),
+      setTemplate: (template) => set((s) => {
+        const upd = { currentTemplate: template };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      setPrimaryColor: (color) => set((s) => {
+        const upd = { primaryColor: color };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      setFontFamily: (font) => set((s) => {
+        const upd = { fontFamily: font };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      updatePersonalInfo: (info) => set((s) => {
+        const data = { ...s.data, personalInfo: { ...s.data.personalInfo, ...info } };
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      addExperience: () => set((s) => {
+        const data = {
+          ...s.data,
+          experiences: [
+            ...s.data.experiences,
+            { id: uuidv4(), company: '', position: '', startDate: '', endDate: '', bulletPoints: '' },
+          ],
+        };
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      updateExperience: (id, updatedExp) => set((s) => {
+        const data = {
+          ...s.data,
+          experiences: s.data.experiences.map((exp) =>
+            exp.id === id ? { ...exp, ...updatedExp } : exp
+          ),
+        };
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      removeExperience: (id) => set((s) => {
+        const data = {
+          ...s.data,
+          experiences: s.data.experiences.filter((exp) => exp.id !== id),
+        };
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      addEducation: () => set((s) => {
+        const data = {
+          ...s.data,
+          educations: [
+            ...s.data.educations,
+            { id: uuidv4(), school: '', degree: '', startDate: '', endDate: '' },
+          ],
+        };
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      updateEducation: (id, updatedEdu) => set((s) => {
+        const data = {
+          ...s.data,
+          educations: s.data.educations.map((edu) =>
+            edu.id === id ? { ...edu, ...updatedEdu } : edu
+          ),
+        };
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      removeEducation: (id) => set((s) => {
+        const data = {
+          ...s.data,
+          educations: s.data.educations.filter((edu) => edu.id !== id),
+        };
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      updateSkills: (skills) => set((s) => {
+        const data = { ...s.data, skills };
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      addSkill: (skill) => set((s) => {
+        const data = { ...s.data, skills: [...s.data.skills, skill] };
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      removeSkill: (skill) => set((s) => {
+        const data = { ...s.data, skills: s.data.skills.filter(sk => sk !== skill) };
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      resetData: () => set((s) => {
+        const data = initialData;
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+      importData: (data) => set((s) => {
+        const upd = { data };
+        syncCvEntry(s, upd);
+        return upd;
+      }),
+
+      createCV: (name) => {
+        const id = uuidv4();
+        const nowStr = now();
+        const project: CVProject = {
+          id, name,
+          data: initialData,
+          template: 'executive',
+          primaryColor: '#0061a4',
+          fontFamily: 'sans',
+          updatedAt: nowStr,
+        };
+        set((s) => ({
+          cvs: [...s.cvs, project],
+          currentCvId: id,
+          data: initialData,
+          currentTemplate: 'executive',
+          primaryColor: '#0061a4',
+          fontFamily: 'sans',
+        }));
+      },
+
+      switchCV: (id) => {
+        const project = get().cvs.find(c => c.id === id);
+        if (project) {
+          set({
+            currentCvId: id,
+            data: project.data,
+            currentTemplate: project.template,
+            primaryColor: project.primaryColor,
+            fontFamily: project.fontFamily,
+          });
+        }
+      },
+
+      deleteCV: (id) => {
+        const state = get();
+        if (state.cvs.length <= 1) return;
+        const remaining = state.cvs.filter(c => c.id !== id);
+        if (remaining.length === 0) return;
+        const first = remaining[0];
+        set({
+          cvs: remaining,
+          currentCvId: first.id,
+          data: first.data,
+          currentTemplate: first.template,
+          primaryColor: first.primaryColor,
+          fontFamily: first.fontFamily,
+        });
+      },
+
+      renameCV: (id, name) => set((s) => ({
+        cvs: s.cvs.map(c => c.id === id ? { ...c, name } : c),
+      })),
+
+      addCoverLetter: (cl) => set((s) => ({
+        coverLetters: [...s.coverLetters, cl],
+      })),
+
+      updateCoverLetter: (id, data) => set((s) => ({
+        coverLetters: s.coverLetters.map(cl =>
+          cl.id === id ? { ...cl, ...data } : cl
+        ),
+      })),
+
+      removeCoverLetter: (id) => set((s) => ({
+        coverLetters: s.coverLetters.filter(cl => cl.id !== id),
+      })),
+
+      addJob: (job) => set((s) => ({
+        jobs: [...s.jobs, { ...job, id: uuidv4(), createdAt: now(), updatedAt: now() }],
+      })),
+
+      updateJob: (id, data) => set((s) => ({
+        jobs: s.jobs.map(j => j.id === id ? { ...j, ...data, updatedAt: now() } : j),
+      })),
+
+      removeJob: (id) => set((s) => ({
+        jobs: s.jobs.filter(j => j.id !== id),
+      })),
+
+      moveJob: (id, status) => set((s) => ({
+        jobs: s.jobs.map(j => j.id === id ? { ...j, status, updatedAt: now() } : j),
+      })),
+
+      incrementUsage: () => set((s) => ({
+        usageCount: s.usageCount + 1,
+      })),
+
+      setUserTier: (tier) => set({ userTier: tier }),
+
+      syncCVToCloud: async () => {
+        const state = get();
+        const project = state.cvs.find(c => c.id === state.currentCvId);
+        if (!project) return;
+        const updated = { ...project, data: state.data, template: state.currentTemplate, primaryColor: state.primaryColor, fontFamily: state.fontFamily, updatedAt: now() };
+        try {
+          await fetch('/api/cv/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cv: updated }),
+          });
+          set((s) => ({
+            cvs: s.cvs.map(c => c.id === updated.id ? updated : c),
+          }));
+        } catch { }
+      },
+
+      loadCVFromCloud: async () => {
+        try {
+          const res = await fetch('/api/cv/load');
+          if (res.ok) {
+            const data = await res.json();
+            return data.cv || null;
+          }
+        } catch { }
+        return null;
+      },
     }),
     {
       name: 'swiftcv-premium-v1',
-      version: 1,
+      version: 2,
       migrate: (persistedState: any, version: number) => {
+        let state = persistedState;
         if (version === 0) {
-          if (persistedState.data && Array.isArray(persistedState.data.experiences)) {
-            persistedState.data.experiences = persistedState.data.experiences.map((exp: any) => {
+          if (state.data && Array.isArray(state.data.experiences)) {
+            state.data.experiences = state.data.experiences.map((exp: any) => {
               if (Array.isArray(exp.bulletPoints)) {
                 return {
                   ...exp,
@@ -213,9 +435,50 @@ export const useCVStore = create<CVStore>()(
               return exp;
             });
           }
+          version = 1;
         }
-        return persistedState;
+        if (version === 1) {
+          if (state.data && !state.cvs) {
+            const firstCvId = uuidv4();
+            const nowStr = now();
+            state.cvs = [{
+              id: firstCvId,
+              name: 'My CV',
+              data: state.data,
+              template: state.currentTemplate || 'executive',
+              primaryColor: state.primaryColor || '#0061a4',
+              fontFamily: state.fontFamily || 'sans',
+              updatedAt: nowStr,
+            }];
+            state.currentCvId = firstCvId;
+            state.coverLetters = state.coverLetters || [];
+            state.userTier = state.userTier || 'free';
+            state.usageCount = state.usageCount || 0;
+          }
+        }
+        return state;
       },
     }
   )
 );
+
+function syncCvEntry(state: any, updates: Record<string, any>) {
+  if (!state.currentCvId || !state.cvs) return;
+  const nowStr = now();
+  const synced = {
+    ...updates,
+    cvs: state.cvs.map((c: CVProject) =>
+      c.id === state.currentCvId
+        ? {
+            ...c,
+            data: updates.data !== undefined ? updates.data : c.data,
+            template: updates.currentTemplate !== undefined ? updates.currentTemplate : c.template,
+            primaryColor: updates.primaryColor !== undefined ? updates.primaryColor : c.primaryColor,
+            fontFamily: updates.fontFamily !== undefined ? updates.fontFamily : c.fontFamily,
+            updatedAt: nowStr,
+          }
+        : c
+    ),
+  };
+  Object.assign(state, synced);
+}
