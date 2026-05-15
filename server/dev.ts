@@ -7,6 +7,8 @@ import { getCVs, saveCV, deleteCV, getUser, createUser, updateUserTier } from '.
 const app = express();
 app.use(express.json({ limit: '5mb' }));
 
+// ── Helper: làm sạch JSON từ response AI ──
+// Xoá markdown ```json và ```, sau đó trích xuất object/array JSON đầu tiên
 function cleanJSON(text: string): string {
   let cleaned = text.replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '').trim();
   const jsonMatch = cleaned.match(/(?:\[|{)[\s\S]*(?:\]|})/);
@@ -14,8 +16,12 @@ function cleanJSON(text: string): string {
   return cleaned;
 }
 
-// ── AI Routes ──
+// ═══════════════════════════════════════════
+//  AI ROUTES — tất cả đều có fallback demo
+// ═══════════════════════════════════════════
 
+// ── POST /api/analyze: Phân tích CV, tính ATS score ──
+// Gọi AI thật → nếu lỗi → fallback demo → nếu vẫn lỗi → 500
 app.post('/api/analyze', async (req, res) => {
   try {
     const { cvData, lang = 'en' } = req.body;
@@ -25,37 +31,33 @@ app.post('/api/analyze', async (req, res) => {
       `You are an expert ATS optimization consultant. Return ONLY valid JSON with: total (0-100), breakdown: {personal:0-15, summary:0-15, experience:0-40, education:0-15, skills:0-15}, details: {contactCompleteness:{score,max:10}, summaryQuality:{score,max:10}, experienceDepth:{score,max:15}, quantifiableMetrics:{score,max:10}, actionVerbs:{score,max:10}, keywordDensity:{score,max:5}}, suggestions: string[] (max 6, in ${language}).`,
       `Analyze this CV:\n\n${JSON.stringify(cvData, null, 2)}`
     );
-    
-    // Clean and parse JSON response
+
+    // Parse JSON từ response, đánh dấu nguồn gốc
     const cleaned = cleanJSON(result);
-    
-    // Validate and parse
     const parsed = JSON.parse(cleaned);
-    
-    // Ensure required fields exist
     if (!parsed.total || !parsed.breakdown || !parsed.suggestions) {
       throw new Error('Invalid response structure');
     }
-    
-    // Mark as real AI response
-    parsed.source = 'ai';
+    parsed.source = 'ai';         // ✅ AI thật
     res.json(parsed);
   } catch (err: any) {
     console.error('[Analyze] AI error:', err.message);
-    // Fallback to demo mode
     try {
       const { cvData, lang = 'en' } = req.body;
       const demoResult = await callDemoAI('ATS optimization', JSON.stringify(cvData));
       const demoParsed = JSON.parse(demoResult);
-      demoParsed.source = 'demo'; // Mark as demo response
+      demoParsed.source = 'demo'; // 🟡 Demo mode
       res.json(demoParsed);
     } catch (demoErr: any) {
       console.error('[Analyze] Demo fallback also failed:', demoErr.message);
-      res.status(500).json({ error: 'AI analysis failed' });
+      res.status(500).json({ error: 'AI analysis failed' }); // ❌ Cả 2 đều lỗi
     }
   }
 });
 
+// ── POST /api/rewrite: Viết lại summary hoặc bullet points ──
+// type = 'summary' → JSON array 3 strings
+// type = 'bullets' → { versions: string[][] }
 app.post('/api/rewrite', async (req, res) => {
   try {
     const { type, content, jobTitle, lang = 'en' } = req.body;
@@ -67,7 +69,7 @@ app.post('/api/rewrite', async (req, res) => {
     const userPrompt = type === 'summary'
       ? `Job Title: ${jobTitle || 'N/A'}\n\nCurrent Summary:\n${content}`
       : `Current bullet points:\n${content}`;
-    
+
     const result = await callAI(systemPrompt, userPrompt);
     res.json(JSON.parse(cleanJSON(result)));
   } catch (err: any) {
@@ -82,6 +84,7 @@ app.post('/api/rewrite', async (req, res) => {
   }
 });
 
+// ── POST /api/suggest-skills: Gợi ý kỹ năng dựa trên kinh nghiệm ──
 app.post('/api/suggest-skills', async (req, res) => {
   try {
     const { experiences, summary, currentSkills, lang = 'en' } = req.body;
@@ -103,8 +106,7 @@ app.post('/api/suggest-skills', async (req, res) => {
   }
 });
 
-// ── Generate Summary from scratch ──
-
+// ── POST /api/generate-summary: Tạo summary mới từ experience/education ──
 app.post('/api/generate-summary', async (req, res) => {
   try {
     const { experiences, education, jobTitle, lang = 'en' } = req.body;
@@ -127,6 +129,7 @@ app.post('/api/generate-summary', async (req, res) => {
   }
 });
 
+// ── POST /api/match: So khớp CV với job description ──
 app.post('/api/match', async (req, res) => {
   try {
     const { cvData, jdText, lang = 'en' } = req.body;
@@ -150,33 +153,34 @@ Return ONLY valid JSON with: matchScore (0-100), breakdown: {keywords:0-100, ski
   }
 });
 
-// ── CV CRUD Routes ──
+// ═══════════════════════════════════════════
+//  CV CRUD ROUTES — lưu/xoá CV qua file JSON
+// ═══════════════════════════════════════════
 
 const ANON_USER = 'anonymous';
 
 // ── Feature Gating Middleware ──
-
+// Giới hạn số lần dùng AI cho free users
 const USAGE_LIMITS: Record<string, number> = {
   free: 5,
-  pro: -1, // unlimited
+  pro: -1,      // unlimited
   business: -1,
   lifetime: -1,
 };
 
 function checkUsage(userId: string, endpoint: string) {
-  // In production, this would check against Vercel KV / database
-  // For now, returns true (allow) in demo mode
+  // Môi trường dev luôn cho phép, prod sẽ check DB
   const user = getUser(userId);
   if (!user || user.tier === 'free') {
-    // Track usage via header
     return { allowed: true, remaining: 5, tier: 'free' };
   }
   return { allowed: true, remaining: -1, tier: user.tier };
 }
 
-// Apply usage tracking to AI endpoints
+// Danh sách các endpoint AI cần tracking usage
 const aiEndpoints = ['/api/analyze', '/api/rewrite', '/api/suggest-skills', '/api/match', '/api/generate-summary', '/api/generate-cover-letter'];
 
+// ── POST /api/cv/save: Lưu CV (upsert) ──
 app.post('/api/cv/save', async (req, res) => {
   try {
     const { cv } = req.body;
@@ -197,6 +201,7 @@ app.post('/api/cv/save', async (req, res) => {
   }
 });
 
+// ── GET /api/cv/load: Lấy tất cả CV ──
 app.get('/api/cv/load', async (req, res) => {
   try {
     const cvs = await getCVs(ANON_USER);
@@ -206,6 +211,7 @@ app.get('/api/cv/load', async (req, res) => {
   }
 });
 
+// ── GET /api/cv/list: Lấy danh sách CV dạng tóm tắt (cho sidebar) ──
 app.get('/api/cv/list', async (req, res) => {
   try {
     const cvs = await getCVs(ANON_USER);
@@ -221,6 +227,7 @@ app.get('/api/cv/list', async (req, res) => {
   }
 });
 
+// ── DELETE /api/cv/delete/:id: Xoá CV ──
 app.delete('/api/cv/delete/:id', async (req, res) => {
   try {
     await deleteCV(ANON_USER, req.params.id);
@@ -230,8 +237,11 @@ app.delete('/api/cv/delete/:id', async (req, res) => {
   }
 });
 
-// ── Auth Routes (Clerk-ready, local dev fallback) ──
+// ═══════════════════════════════════════════
+//  AUTH ROUTES — đăng ký, login, migrate
+// ═══════════════════════════════════════════
 
+// ── POST /api/auth/create: Tạo user mới (nếu chưa tồn tại) ──
 app.post('/api/auth/create', async (req, res) => {
   try {
     const { id, email, name } = req.body;
@@ -246,6 +256,7 @@ app.post('/api/auth/create', async (req, res) => {
   }
 });
 
+// ── GET /api/auth/user/:id: Lấy thông tin user ──
 app.get('/api/auth/user/:id', async (req, res) => {
   try {
     const user = getUser(req.params.id);
@@ -256,11 +267,11 @@ app.get('/api/auth/user/:id', async (req, res) => {
   }
 });
 
+// ── POST /api/auth/migrate: Chuyển CV từ anonymous → tài khoản ──
 app.post('/api/auth/migrate', async (req, res) => {
   try {
     const { userId, cvs } = req.body;
     if (!userId || !cvs) return res.status(400).json({ error: 'userId and cvs required' });
-    // Save all anonymous CVs to the new user account
     for (const cv of cvs) {
       await saveCV(userId, { ...cv, user_id: userId });
     }
@@ -270,6 +281,7 @@ app.post('/api/auth/migrate', async (req, res) => {
   }
 });
 
+// ── POST /api/auth/upgrade: Nâng cấp tier (free → pro/business/lifetime) ──
 app.post('/api/auth/upgrade', async (req, res) => {
   try {
     const { userId, tier } = req.body;
@@ -281,7 +293,9 @@ app.post('/api/auth/upgrade', async (req, res) => {
   }
 });
 
-// ── Cover Letter Generation ──
+// ═══════════════════════════════════════════
+//  COVER LETTER — tạo thư xin việc
+// ═══════════════════════════════════════════
 
 app.post('/api/generate-cover-letter', async (req, res) => {
   try {
@@ -309,8 +323,12 @@ app.post('/api/generate-cover-letter', async (req, res) => {
   }
 });
 
-// ── Stripe API ──
+// ═══════════════════════════════════════════
+//  STRIPE API — thanh toán (demo mode)
+// ═══════════════════════════════════════════
 
+// ── POST /api/stripe/checkout: Tạo session checkout Stripe ──
+// Nếu không có STRIPE_SECRET_KEY → trả về URL demo
 app.post('/api/stripe/checkout', async (req, res) => {
   try {
     const { priceId, successUrl, cancelUrl } = req.body;
@@ -339,6 +357,7 @@ app.post('/api/stripe/checkout', async (req, res) => {
   }
 });
 
+// ── POST /api/stripe/webhook: Xử lý webhook từ Stripe ──
 app.post('/api/stripe/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'] as string;
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
@@ -360,7 +379,9 @@ app.post('/api/stripe/webhook', async (req, res) => {
   }
 });
 
-// ── LinkedIn Import ──
+// ═══════════════════════════════════════════
+//  LINKEDIN IMPORT — parse dữ liệu từ LinkedIn PDF
+// ═══════════════════════════════════════════
 
 app.post('/api/import-linkedin', async (req, res) => {
   try {
@@ -395,6 +416,10 @@ Use empty strings for missing fields. Generate unique IDs for each entry. Format
     }
   }
 });
+
+// ═══════════════════════════════════════════
+//  SERVER STARTUP
+// ═══════════════════════════════════════════
 
 const PORT = process.env.PORT || 3001;
 const server = http.createServer(app);

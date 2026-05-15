@@ -1,5 +1,6 @@
 import type { CVData } from './useCVStore';
 
+// ── Kiểu kết quả phân tích CV (giống format API trả về) ──
 export interface ScoreResult {
   total: number;
   breakdown: {
@@ -20,6 +21,7 @@ export interface ScoreResult {
   suggestions: string[];
 }
 
+// ── Danh sách từ khóa ATS phổ biến để check keyword density ──
 const COMMON_KEYWORDS = [
   'react', 'typescript', 'javascript', 'node.js', 'python', 'java', 'aws', 'docker',
   'kubernetes', 'sql', 'nosql', 'agile', 'scrum', 'ci/cd', 'git', 'rest api',
@@ -28,6 +30,7 @@ const COMMON_KEYWORDS = [
   'communication', 'problem solving', 'collaboration', 'negotiation', 'finance'
 ];
 
+// ── Action verbs mạnh (so với "Responsible for") ──
 const ACTION_VERBS = [
   'led', 'spearheaded', 'achieved', 'delivered', 'drove', 'launched', 'developed',
   'implemented', 'created', 'designed', 'established', 'generated', 'increased',
@@ -37,6 +40,7 @@ const ACTION_VERBS = [
   'boosted', 'secured', 'strengthened', 'maximized', 'restructured', 'reorganized'
 ];
 
+// ── Chuyển HTML → text thuần (xoá thẻ, giữ xuống dòng) ──
 function stripHtml(html: string): string {
   return html
     .replace(/<\/li>/g, '\n')
@@ -46,22 +50,32 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+// ── Tách bullet points từ HTML string ──
 function extractBullets(raw: string): string[] {
   const text = stripHtml(raw);
   return text.split('\n').filter(p => p.trim().length > 0).map(p => p.trim());
 }
 
+// ── Đếm action verbs trong text ──
 function countActionVerbs(text: string): number {
   const lower = text.toLowerCase();
   return ACTION_VERBS.filter(v => new RegExp(`\\b${v}\\b`).test(lower)).length;
 }
 
+// ── Đếm số liệu định lượng (%, $, số users/customers...) ──
 function countMetrics(text: string): number {
   const matches = text.match(/[\d]+%|\$\s*[\d,]+(?:\.\d+)?|[\d]+(?:\s*%|\s*users|\s*customers|\s*revenue|\s*sales|\s*clients|\s*projects|\s*team|\s*employees|\s*countries|\s*cities|\s*offices)/gi);
   return matches ? matches.length : 0;
 }
 
+// ── Helper i18n đơn giản (chỉ vi/en) ──
 const t = (vi: string, en: string, lang: string) => lang === 'vi' ? vi : en;
+
+// ═══════════════════════════════════════
+//  PHÂN TÍCH CV (rule-based, không AI)
+//  Đây là engine chấm điểm offline,
+//  dùng khi API AI fail hoặc chưa gọi
+// ═══════════════════════════════════════
 
 export const analyzeCV = (data: CVData, lang: 'en' | 'vi' | 'ja' | 'ko' | 'zh' | 'es' | 'fr' | 'de'): ScoreResult => {
   const suggestions: string[] = [];
@@ -80,6 +94,7 @@ export const analyzeCV = (data: CVData, lang: 'en' | 'vi' | 'ja' | 'ko' | 'zh' |
   const pi = data.personalInfo || {};
 
   // ── 1. Personal / Contact (Max: 10 + 5 bonus = 15) ──
+  // Kiểm tra: fullName, email hợp lệ, phone, LinkedIn, GitHub/Portfolio
   let contactScore = 0;
   if (pi.fullName && pi.fullName.length > 2) contactScore += 2;
   if (pi.email && pi.email.includes('@') && pi.email.includes('.')) contactScore += 2;
@@ -98,6 +113,7 @@ export const analyzeCV = (data: CVData, lang: 'en' | 'vi' | 'ja' | 'ko' | 'zh' |
   }
 
   // ── 2. Summary (Max: 15) ──
+  // Đánh giá độ dài: lý tưởng 30-80 từ
   const summary = pi.summary || '';
   const summaryWords = summary.trim().split(/\s+/).filter(Boolean).length;
 
@@ -118,6 +134,7 @@ export const analyzeCV = (data: CVData, lang: 'en' | 'vi' | 'ja' | 'ko' | 'zh' |
   }
 
   // ── 3. Experience (Max: 40 total) ──
+  // Chấm điểm dựa trên: depth (company, position, bullets), metrics, action verbs
   const experiences = data.experiences || [];
   if (experiences.length > 0) {
     let expDepthScore = 0;
@@ -177,20 +194,18 @@ export const analyzeCV = (data: CVData, lang: 'en' | 'vi' | 'ja' | 'ko' | 'zh' |
   }
 
   // ── 5. Skills & Keywords (Max: 15) ──
+  // Điểm skills dựa trên số lượng skills + keyword density
   const skills = data.skills || [];
-  if (skills.length >= 8) {
-    breakdown.skills += 10;
-  } else if (skills.length >= 5) {
-    breakdown.skills += 7;
-  } else if (skills.length >= 3) {
-    breakdown.skills += 4;
-  } else if (skills.length > 0) {
-    breakdown.skills += 2;
-  }
+  if (skills.length >= 8) breakdown.skills += 10;
+  else if (skills.length >= 5) breakdown.skills += 7;
+  else if (skills.length >= 3) breakdown.skills += 4;
+  else if (skills.length > 0) breakdown.skills += 2;
+
   if (skills.length < 5) {
     suggestions.push(t('Nên có ít nhất 5 kỹ năng chuyên môn để tối ưu ATS.', 'Include at least 5 professional skills for ATS optimization.', lang));
   }
 
+  // Quét toàn bộ CV tìm từ khóa ATS phổ biến
   const allText = JSON.stringify(data).toLowerCase();
   const foundKeywords = COMMON_KEYWORDS.filter(kw => allText.includes(kw));
   details.keywordDensity = { score: Math.min(foundKeywords.length, 5), max: 5 };

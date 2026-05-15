@@ -1,7 +1,9 @@
 import type { CVData, CVProject } from '../store/useCVStore';
 
+// ── Base URL cho tất cả API calls (proxy qua Vite) ──
 const API_BASE = '/api';
 
+// ── POST generic: gọi API, tự động parse JSON, bắn lỗi nếu không OK ──
 async function post<T = any>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
@@ -15,6 +17,7 @@ async function post<T = any>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+// ── GET generic ──
 async function get<T = any>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) {
@@ -24,6 +27,7 @@ async function get<T = any>(path: string): Promise<T> {
   return res.json();
 }
 
+// ── DELETE generic ──
 async function del<T = any>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
   if (!res.ok) {
@@ -33,7 +37,9 @@ async function del<T = any>(path: string): Promise<T> {
   return res.json();
 }
 
-// ── AI Routes ──
+// ═══════════════════════════
+//  AI Routes — gọi backend
+// ═══════════════════════════
 
 export async function analyzeCV(cvData: CVData, lang: string) {
   return post('/analyze', { cvData, lang });
@@ -69,7 +75,9 @@ export async function matchJD(cvData: CVData, jdText: string, lang: string) {
   return post('/match', { cvData, jdText, lang });
 }
 
-// ── CV CRUD Routes ──
+// ═══════════════════════════
+//  CV CRUD — đồng bộ cloud
+// ═══════════════════════════
 
 export async function saveCVToCloud(cv: CVProject): Promise<void> {
   await post('/cv/save', { cv });
@@ -87,25 +95,33 @@ export async function deleteCVFromCloud(id: string): Promise<void> {
   await del(`/cv/delete/${id}`);
 }
 
-// ── Cover Letter ──
+// ═══════════════════════════
+//  Cover Letter
+// ═══════════════════════════
 
 export async function generateCoverLetter(cvData: CVData, companyName: string, jobTitle: string, tone: string, lang: string) {
   return post('/generate-cover-letter', { cvData, companyName, jobTitle, tone, lang });
 }
 
-// ── Stripe ──
+// ═══════════════════════════
+//  Stripe — thanh toán
+// ═══════════════════════════
 
 export async function createCheckoutSession(priceId: string) {
   return post('/stripe/checkout', { priceId, successUrl: window.location.origin + '/?checkout=success', cancelUrl: window.location.origin + '/pricing' });
 }
 
-// ── LinkedIn Import ──
+// ═══════════════════════════
+//  LinkedIn Import
+// ═══════════════════════════
 
 export async function importLinkedIn(pdfText: string) {
   return post('/import-linkedin', { pdfText });
 }
 
-// ── Auth Routes ──
+// ═══════════════════════════
+//  Auth Routes — user + migrate
+// ═══════════════════════════
 
 export async function createAuthUser(id: string, email?: string, name?: string) {
   return post('/auth/create', { id, email, name });

@@ -1,13 +1,16 @@
+// ── Biến môi trường: API key cho Zen và OpenRouter ──
 const OPENCODE_API_KEY = process.env.OPENCODE_API_KEY;
 const OPENROUTER_KEY = process.env.OPENROUTER_KEY;
 
-// Config via env vars — set ZEN_MODEL and ZEN_API_URL to customize
+// Cấu hình model Zen — có thể ghi đè qua biến môi trường
 // Free models: big-pickle | deepseek-v4-flash-free | minimax-m2.5-free | nemotron-3-super-free
 const ZEN_API_URL = process.env.ZEN_API_URL || 'https://opencode.ai/zen/v1/chat/completions';
 const ZEN_MODEL = process.env.ZEN_MODEL || 'big-pickle';
 
+// ── Hàm gọi AI chính ──
+// Ưu tiên: Zen API → OpenRouter → Demo mode
 export async function callAI(systemPrompt: string, userPrompt: string): Promise<string> {
-  // Try OpenCode Zen first (primary)
+  // Thử Zen API trước (nếu có key)
   if (OPENCODE_API_KEY) {
     try {
       return await callZen(systemPrompt, userPrompt);
@@ -16,7 +19,7 @@ export async function callAI(systemPrompt: string, userPrompt: string): Promise<
     }
   }
 
-  // Try OpenRouter as secondary fallback
+  // Nếu Zen lỗi → thử OpenRouter (nếu có key)
   if (OPENROUTER_KEY) {
     try {
       return await callOpenRouter(systemPrompt, userPrompt);
@@ -25,10 +28,11 @@ export async function callAI(systemPrompt: string, userPrompt: string): Promise<
     }
   }
 
-  // Demo mode: no API key needed
+  // Không có key hoặc tất cả đều lỗi → dùng demo mode
   return callDemoAI(systemPrompt, userPrompt);
 }
 
+// ── Gọi OpenCode Zen API (OpenAI-compatible) ──
 async function callZen(system: string, user: string): Promise<string> {
   const res = await fetch(ZEN_API_URL, {
     method: 'POST',
@@ -49,7 +53,8 @@ async function callZen(system: string, user: string): Promise<string> {
   const rawText = await res.text();
   console.log(`[Zen API] Status: ${res.status}, Response length: ${rawText.length}`);
   if (!res.ok) throw new Error(`Zen API ${res.status}: ${rawText}`);
-  
+
+  // Parse JSON response, log lỗi nếu response không hợp lệ
   let data;
   try {
     data = JSON.parse(rawText);
@@ -57,12 +62,14 @@ async function callZen(system: string, user: string): Promise<string> {
     console.error('[Zen API] Failed to parse JSON. Raw response:', rawText.substring(0, 500));
     throw new Error(`Zen API returned invalid JSON: ${rawText.substring(0, 200)}`);
   }
-  
+
+  // Lấy nội dung từ response chuẩn OpenAI format
   const content = data?.choices?.[0]?.message?.content || '';
   console.log(`[Zen API] Response content length: ${content.length}`);
   return content;
 }
 
+// ── Fallback: gọi OpenRouter (dùng Gemini Flash free) ──
 async function callOpenRouter(system: string, user: string): Promise<string> {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -85,7 +92,8 @@ async function callOpenRouter(system: string, user: string): Promise<string> {
   return data?.choices?.[0]?.message?.content || '';
 }
 
-// ── Demo mode: no API key needed, returns realistic template responses ──
+// ── Demo mode: không cần API key, trả về dữ liệu giả lập ──
+// Dùng regex trên system prompt để xác định loại request (mode)
 export function callDemoAI(system: string, user: string): Promise<string> {
   const mode = system.includes('how well this CV matches') ? 'match'
     : system.includes('ATS optimization') ? 'analyze'
@@ -96,16 +104,19 @@ export function callDemoAI(system: string, user: string): Promise<string> {
     : system.includes('data extraction') ? 'linkedin-import'
     : 'analyze';
 
+  // Parse dữ liệu từ user prompt để tạo response "có vẻ thật"
   const hasMetrics = /\d+%|\$|[\d]+ (users|customers|revenue|clients)/i.test(user);
   const bulletCount = (user.match(/•|bullet|achieved|led|managed/gi) || []).length;
   const skillsMatch = user.match(/Current skills: (.*?)(?:\n|$)/);
   const currentSkills = skillsMatch ? skillsMatch[1].split(', ').filter(Boolean) : [];
 
+  // Delay ngẫu nhiên 0.8-2s để giống AI thật
   const delay = 800 + Math.random() * 1200;
 
   return new Promise(resolve => {
     setTimeout(() => {
       switch (mode) {
+        // ── JD Match: so sánh CV với mô tả công việc ──
         case 'match': {
           const jdKeywords = (user.match(/requirements?:?\s*([^]*?)(?:\n\n|$)/i)?.[1] || user).toLowerCase();
           const cvKeywords = ['react', 'typescript', 'leadership', 'management', 'python', 'aws', 'agile', 'docker', 'sql', 'communication'];
@@ -132,6 +143,8 @@ export function callDemoAI(system: string, user: string): Promise<string> {
           }));
           break;
         }
+
+        // ── Phân tích CV: đánh giá tổng thể ATS score ──
         case 'analyze': {
           const score = Math.min(45 + Math.floor(Math.random() * 30), 95);
           resolve(JSON.stringify({
@@ -161,6 +174,8 @@ export function callDemoAI(system: string, user: string): Promise<string> {
           }));
           break;
         }
+
+        // ── Rewrite Summary: 3 phiên bản summary khác nhau ──
         case 'rewrite-summary': {
           const jobTitle = user.match(/Job Title: (.+?)(?:\n|$)/)?.[1] || 'Professional';
           resolve(JSON.stringify([
@@ -170,6 +185,8 @@ export function callDemoAI(system: string, user: string): Promise<string> {
           ]));
           break;
         }
+
+        // ── Rewrite Bullets: 2 bộ bullet points cải thiện ──
         case 'rewrite-bullets': {
           resolve(JSON.stringify({
             versions: [
@@ -187,6 +204,8 @@ export function callDemoAI(system: string, user: string): Promise<string> {
           }));
           break;
         }
+
+        // ── Gợi ý kỹ năng: lọc từ danh sách hardcode, loại trừ skills hiện tại ──
         case 'suggest-skills': {
           const allSkills = [
             'Strategic Planning', 'Cross-functional Leadership', 'Business Development',
@@ -202,6 +221,8 @@ export function callDemoAI(system: string, user: string): Promise<string> {
           resolve(JSON.stringify(suggested));
           break;
         }
+
+        // ── Cover Letter: template có sẵn, chỉ thay company + job title ──
         case 'cover-letter': {
           const companyName = user.match(/Company: (.+?)(?:\n|$)/)?.[1] || 'the company';
           const jobTitle = user.match(/Position: (.+?)(?:\n|$)/)?.[1] || 'the position';
@@ -212,6 +233,8 @@ export function callDemoAI(system: string, user: string): Promise<string> {
           }));
           break;
         }
+
+        // ── LinkedIn Import: trả về dữ liệu fake để test giao diện ──
         case 'linkedin-import': {
           resolve(JSON.stringify({
             fullName: 'John Doe',
@@ -231,6 +254,8 @@ export function callDemoAI(system: string, user: string): Promise<string> {
           }));
           break;
         }
+
+        // ── Generate Summary từ đầu (dùng cho nút Generate trong form) ──
         case 'generate-summary': {
           const jobTitle = user.match(/Target Role: (.+?)(?:\n|$)/)?.[1] || 'Professional';
           resolve(JSON.stringify([
