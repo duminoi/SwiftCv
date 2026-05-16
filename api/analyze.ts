@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { callAI } from './gemini';
+import { callAI, safeParseJSON } from './zen';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -14,9 +14,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `Analyze this CV:\n\n${JSON.stringify(cvData, null, 2)}`
     );
 
-    const cleaned = result.replace(/```(?:json)?\s*/gi, '').trim();
-    return res.status(200).json(JSON.parse(cleaned));
+    const parsed = safeParseJSON(result);
+    if (!parsed.total || !parsed.breakdown || !parsed.suggestions) {
+      throw new Error('Invalid response structure');
+    } 
+    return res.status(200).json(parsed);
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    console.error('[analyze API] Error:', err.message);
+    console.error('[analyze API] Stack:', err.stack);
+    return res.status(500).json({ 
+      error: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 }

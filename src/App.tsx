@@ -2,7 +2,6 @@ import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCVStore } from './store/useCVStore';
 import type { JobStatus } from './store/useCVStore';
-import { analyzeCV } from './store/cvAnalyzer';
 import html2pdf from 'html2pdf.js';
 import { StandardTemplate } from './components/templates/StandardTemplate';
 import { MinimalistTemplate } from './components/templates/MinimalistTemplate';
@@ -154,8 +153,6 @@ function App() {
 
   const [newJob, setNewJob] = useState<{ company: string; position: string; url: string }>({ company: '', position: '', url: '' });
 
-  const analysis = useMemo(() => analyzeCV(data, language), [data, language]);
-
   const sectionProgress = useMemo(() => {
     const pi = data.personalInfo;
     const personalFilled = [pi.fullName, pi.jobTitle, pi.email, pi.phone].filter(Boolean).length;
@@ -173,7 +170,7 @@ function App() {
       .then(result => setAiState({ loading: false, result, error: null }))
       .catch(err => {
         setAiState({ loading: false, result: null, error: err.message });
-        setAiErrorToast(err.message.includes('401') ? 'AI API key không hợp lệ. Kiểm tra OPENCODE_API_KEY trong .env' : `AI error: ${err.message}`);
+        setAiErrorToast(err.message.includes('401') ? 'AI API key không hợp lệ. Kiểm tra OPENCODE_API_KEY trong .env' : `AI unavailable — ${err.message}`);
         setTimeout(() => setAiErrorToast(null), 8000);
       });
   }, [activeTab, data, language]);
@@ -821,7 +818,6 @@ function App() {
           </div>
         );
       case 'analysis':
-        const aiResult = aiState.result || analysis;
         return (
           <div className="space-y-8 animate-in fade-in duration-300">
             <div className="flex items-center justify-between">
@@ -841,23 +837,23 @@ function App() {
               <div className="flex items-start gap-3 bg-error-container/20 p-3 rounded border border-error-container text-sm text-on-surface">
                 <Icon name="error" className="text-error mt-0.5 shrink-0" />
                 <div>
-                  <p className="font-medium">AI unavailable — showing rule-based analysis</p>
+                  <p className="font-medium">AI unavailable</p>
                   <p className="text-xs text-on-surface-variant mt-1">{aiState.error}</p>
                 </div>
               </div>
             )}
 
-             {!aiState.loading && (
+             {!aiState.loading && aiState.result && (
                <div className="bg-surface-container-lowest p-4 sm:p-6 rounded-lg border border-outline-variant shadow-sm space-y-6">
                  <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 mb-4">
-                   <ScoreGauge value={aiResult.total} size={110} thickness={8} label="ATS Score" />
+                   <ScoreGauge value={aiState.result.total} size={110} thickness={8} label="ATS Score" />
                    <div className="flex-1 w-full space-y-1.5">
                     {[
-                      { key: t('analysis.breakdown.personal'), score: aiResult.breakdown.personal, max: 15 },
-                      { key: t('analysis.breakdown.summary'), score: aiResult.breakdown.summary, max: 15 },
-                      { key: t('analysis.breakdown.experience'), score: aiResult.breakdown.experience, max: 40 },
-                      { key: t('analysis.breakdown.education'), score: aiResult.breakdown.education, max: 15 },
-                      { key: t('analysis.breakdown.skills'), score: aiResult.breakdown.skills, max: 15 },
+                      { key: t('analysis.breakdown.personal'), score: aiState.result.breakdown.personal, max: 15 },
+                      { key: t('analysis.breakdown.summary'), score: aiState.result.breakdown.summary, max: 15 },
+                      { key: t('analysis.breakdown.experience'), score: aiState.result.breakdown.experience, max: 40 },
+                      { key: t('analysis.breakdown.education'), score: aiState.result.breakdown.education, max: 15 },
+                      { key: t('analysis.breakdown.skills'), score: aiState.result.breakdown.skills, max: 15 },
                     ].map((item) => {
                       const pct = item.score / item.max;
                       const barColor = pct >= 0.7 ? '#14B8A6' : pct >= 0.4 ? '#F59E0B' : '#EF4444';
@@ -885,9 +881,9 @@ function App() {
 
                 <div className="border-t border-outline-variant pt-4 grid grid-cols-3 gap-2 sm:gap-4">
                   {[
-                    { label: 'Contact', score: aiResult.details.contactCompleteness.score, max: aiResult.details.contactCompleteness.max, icon: 'contact_page' },
-                    { label: 'Metrics', score: aiResult.details.quantifiableMetrics.score, max: aiResult.details.quantifiableMetrics.max, icon: 'bar_chart' },
-                    { label: 'Action Verbs', score: aiResult.details.actionVerbs.score, max: aiResult.details.actionVerbs.max, icon: 'flash_on' },
+                    { label: 'Contact', score: aiState.result.details.contactCompleteness.score, max: aiState.result.details.contactCompleteness.max, icon: 'contact_page' },
+                    { label: 'Metrics', score: aiState.result.details.quantifiableMetrics.score, max: aiState.result.details.quantifiableMetrics.max, icon: 'bar_chart' },
+                    { label: 'Action Verbs', score: aiState.result.details.actionVerbs.score, max: aiState.result.details.actionVerbs.max, icon: 'flash_on' },
                   ].map(item => {
                     const pct = item.score / item.max;
                     const color = pct >= 0.7 ? '#14B8A6' : pct >= 0.4 ? '#F59E0B' : '#EF4444';
@@ -913,7 +909,7 @@ function App() {
 
                 <div className="space-y-2.5">
                   <h4 className="font-label-small text-label-small text-on-surface-variant uppercase tracking-wider">{t('labels.topSuggestions')}</h4>
-                  {aiResult.suggestions.map((suggestion: string, idx: number) => (
+                  {aiState.result.suggestions.map((suggestion: string, idx: number) => (
                     <div key={idx} className="flex items-start gap-3 bg-error-container/15 p-3.5 rounded-xl border border-error-container/30 text-sm text-on-surface">
                       <div className="w-6 h-6 rounded-full bg-error-container/30 flex items-center justify-center shrink-0 mt-0.5">
                         <Icon name="priority_high" className="text-[14px] text-error" />
@@ -921,7 +917,7 @@ function App() {
                       <span className="leading-relaxed">{suggestion}</span>
                     </div>
                   ))}
-                  {aiResult.suggestions.length === 0 && (
+                  {aiState.result.suggestions.length === 0 && (
                     <div className="flex items-center gap-3 text-sm text-green-700 bg-green-50 p-3.5 rounded-xl border border-green-200/60">
                       <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                         <Icon name="check_circle" className="text-[16px] text-green-600" />

@@ -1,63 +1,44 @@
 import 'dotenv/config';
 import http from 'http';
 import express from 'express';
-import { callAI, callDemoAI } from '../api/zen';
+import { callAI, safeParseJSON } from '../api/zen';
 import { getCVs, saveCV, deleteCV, getUser, createUser, updateUserTier } from '../api/db';
 
 const app = express();
 app.use(express.json({ limit: '5mb' }));
 
 // ── Helper: làm sạch JSON từ response AI ──
-// Xoá markdown ```json và ```, sau đó trích xuất object/array JSON đầu tiên
-function cleanJSON(text: string): string {
-  let cleaned = text.replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '').trim();
-  const jsonMatch = cleaned.match(/(?:\[|{)[\s\S]*(?:\]|})/);
-  if (jsonMatch) cleaned = jsonMatch[0];
-  return cleaned;
-}
+// safeParseJSON từ api/zen đã xử lý toàn bộ
 
 // ═══════════════════════════════════════════
-//  AI ROUTES — tất cả đều có fallback demo
+//  AI ROUTES
 // ═══════════════════════════════════════════
 
 // ── POST /api/analyze: Phân tích CV, tính ATS score ──
-// Gọi AI thật → nếu lỗi → fallback demo → nếu vẫn lỗi → 500
 app.post('/api/analyze', async (req, res) => {
   try {
     const { cvData, lang = 'en' } = req.body;
     if (!cvData) return res.status(400).json({ error: 'cvData is required' });
     const language = lang === 'vi' ? 'Vietnamese' : 'English';
-    let result = await callAI(
+    const result = await callAI(
       `You are an expert ATS optimization consultant. Return ONLY valid JSON with: total (0-100), breakdown: {personal:0-15, summary:0-15, experience:0-40, education:0-15, skills:0-15}, details: {contactCompleteness:{score,max:10}, summaryQuality:{score,max:10}, experienceDepth:{score,max:15}, quantifiableMetrics:{score,max:10}, actionVerbs:{score,max:10}, keywordDensity:{score,max:5}}, suggestions: string[] (max 6, in ${language}).`,
       `Analyze this CV:\n\n${JSON.stringify(cvData, null, 2)}`
     );
-
-    // Parse JSON từ response, đánh dấu nguồn gốc
-    const cleaned = cleanJSON(result);
-    const parsed = JSON.parse(cleaned);
+    console.log('[Analyze] Raw AI response length:', result?.length || 0);
+    console.log('[Analyze] Raw AI response preview:', result?.substring(0, 300));
+    const parsed = safeParseJSON(result);
     if (!parsed.total || !parsed.breakdown || !parsed.suggestions) {
       throw new Error('Invalid response structure');
     }
-    parsed.source = 'ai';         // ✅ AI thật
+    parsed.source = 'ai';
     res.json(parsed);
   } catch (err: any) {
     console.error('[Analyze] AI error:', err.message);
-    try {
-      const { cvData, lang = 'en' } = req.body;
-      const demoResult = await callDemoAI('ATS optimization', JSON.stringify(cvData));
-      const demoParsed = JSON.parse(demoResult);
-      demoParsed.source = 'demo'; // 🟡 Demo mode
-      res.json(demoParsed);
-    } catch (demoErr: any) {
-      console.error('[Analyze] Demo fallback also failed:', demoErr.message);
-      res.status(500).json({ error: 'AI analysis failed' }); // ❌ Cả 2 đều lỗi
-    }
+    res.status(500).json({ error: err.message });
   }
 });
 
 // ── POST /api/rewrite: Viết lại summary hoặc bullet points ──
-// type = 'summary' → JSON array 3 strings
-// type = 'bullets' → { versions: string[][] }
 app.post('/api/rewrite', async (req, res) => {
   try {
     const { type, content, jobTitle, lang = 'en' } = req.body;
@@ -69,22 +50,15 @@ app.post('/api/rewrite', async (req, res) => {
     const userPrompt = type === 'summary'
       ? `Job Title: ${jobTitle || 'N/A'}\n\nCurrent Summary:\n${content}`
       : `Current bullet points:\n${content}`;
-
     const result = await callAI(systemPrompt, userPrompt);
-    res.json(JSON.parse(cleanJSON(result)));
+    res.json(safeParseJSON(result));
   } catch (err: any) {
     console.error('[Rewrite] AI error:', err.message);
-    try {
-      const { type, content, jobTitle } = req.body;
-      const demoResult = await callDemoAI(`CV writer. Return JSON array or {versions:[[]]}.`, JSON.stringify({ type, content, jobTitle }));
-      res.json(JSON.parse(demoResult));
-    } catch (demoErr: any) {
-      res.status(500).json({ error: 'AI rewrite failed' });
-    }
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ── POST /api/suggest-skills: Gợi ý kỹ năng dựa trên kinh nghiệm ──
+// ── POST /api/suggest-skills: Gợi ý kỹ năng ──
 app.post('/api/suggest-skills', async (req, res) => {
   try {
     const { experiences, summary, currentSkills, lang = 'en' } = req.body;
@@ -93,20 +67,14 @@ app.post('/api/suggest-skills', async (req, res) => {
       `You are a career advisor. Return ONLY a JSON array of strings (10-15 skill names in ${language}). Mix hard and soft skills, prioritize skills implied by experience but not listed.`,
       `Current skills: ${(currentSkills || []).join(', ')}\nSummary: ${summary || 'N/A'}\nExperience:\n${JSON.stringify(experiences, null, 2)}`
     );
-    res.json(JSON.parse(cleanJSON(result)));
+    res.json(safeParseJSON(result));
   } catch (err: any) {
     console.error('[SuggestSkills] AI error:', err.message);
-    try {
-      const { currentSkills = [] } = req.body;
-      const demoResult = await callDemoAI('career advisor', `Current skills: ${currentSkills.join(', ')}`);
-      res.json(JSON.parse(demoResult));
-    } catch (demoErr: any) {
-      res.status(500).json({ error: 'AI suggestion failed' });
-    }
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ── POST /api/generate-summary: Tạo summary mới từ experience/education ──
+// ── POST /api/generate-summary: Tạo summary mới ──
 app.post('/api/generate-summary', async (req, res) => {
   try {
     const { experiences, education, jobTitle, lang = 'en' } = req.body;
@@ -116,20 +84,14 @@ app.post('/api/generate-summary', async (req, res) => {
       `You are a professional CV writer. Return ONLY a JSON array of 3 strings (professional summary versions in ${language}). Each 2-4 sentences, 40-80 words, include keywords naturally, start strong. Base the summary on the provided experience and education.`,
       `Target Role: ${jobTitle || 'N/A'}\nExperiences:\n${JSON.stringify(experiences, null, 2)}\nEducation:\n${JSON.stringify(education || [], null, 2)}`
     );
-    res.json(JSON.parse(cleanJSON(result)));
+    res.json(safeParseJSON(result));
   } catch (err: any) {
     console.error('[GenerateSummary] AI error:', err.message);
-    try {
-      const { experiences, education, jobTitle } = req.body;
-      const demoResult = await callDemoAI('CV writer and summary', JSON.stringify({ experiences, education, jobTitle }));
-      res.json(JSON.parse(demoResult));
-    } catch (demoErr: any) {
-      res.status(500).json({ error: 'AI summary failed' });
-    }
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ── POST /api/match: So khớp CV với job description ──
+// ── POST /api/match: So khớp CV với JD ──
 app.post('/api/match', async (req, res) => {
   try {
     const { cvData, jdText, lang = 'en' } = req.body;
@@ -140,16 +102,10 @@ app.post('/api/match', async (req, res) => {
 Return ONLY valid JSON with: matchScore (0-100), breakdown: {keywords:0-100, skills:0-100, experience:0-100, education:0-100}, missingKeywords: string[] (max 10), matchingKeywords: string[] (max 10), suggestions: string[] (max 6, in ${language}), experienceGap: string.`,
       `CV Data:\n${JSON.stringify(cvData, null, 2)}\n\nJob Description:\n${jdText}`
     );
-    res.json(JSON.parse(cleanJSON(result)));
+    res.json(safeParseJSON(result));
   } catch (err: any) {
     console.error('[Match] AI error:', err.message);
-    try {
-      const { cvData, jdText } = req.body;
-      const demoResult = await callDemoAI('how well this CV matches', JSON.stringify({ cvData, jdText }));
-      res.json(JSON.parse(demoResult));
-    } catch (demoErr: any) {
-      res.status(500).json({ error: 'AI matching failed' });
-    }
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -305,21 +261,14 @@ app.post('/api/generate-cover-letter', async (req, res) => {
     const toneGuide = tone === 'professional'
       ? 'Formal, respectful, traditional business letter tone'
       : 'Conversational, modern, slightly casual but still professional';
-
     const result = await callAI(
       `You are a professional cover letter writer. Return ONLY a JSON object with: subject (string), body (string, 3-4 paragraphs in ${language}), and salutation (string). Tone: ${toneGuide}. Do not invent facts not present in the CV.`,
       `CV Data:\n${JSON.stringify(cvData, null, 2)}\n\nCompany: ${companyName}\nPosition: ${jobTitle || 'N/A'}`
     );
-    res.json(JSON.parse(cleanJSON(result)));
+    res.json(safeParseJSON(result));
   } catch (err: any) {
     console.error('[CoverLetter] AI error:', err.message);
-    try {
-      const { cvData, companyName, jobTitle } = req.body;
-      const demoResult = await callDemoAI('cover letter', JSON.stringify({ cvData, companyName, jobTitle }));
-      res.json(JSON.parse(demoResult));
-    } catch (demoErr: any) {
-      res.status(500).json({ error: 'AI cover letter failed' });
-    }
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -387,7 +336,6 @@ app.post('/api/import-linkedin', async (req, res) => {
   try {
     const { pdfText } = req.body;
     if (!pdfText) return res.status(400).json({ error: 'pdfText is required' });
-
     const result = await callAI(
       `You are a data extraction specialist. Parse the LinkedIn profile text and return ONLY valid JSON with this EXACT schema:
 {
@@ -405,15 +353,10 @@ app.post('/api/import-linkedin', async (req, res) => {
 Use empty strings for missing fields. Generate unique IDs for each entry. Format bulletPoints as HTML <ul><li>...</li></ul>.`,
       `LinkedIn Profile Text:\n${pdfText}`
     );
-    res.json(JSON.parse(cleanJSON(result)));
+    res.json(safeParseJSON(result));
   } catch (err: any) {
     console.error('[LinkedInImport] AI error:', err.message);
-    try {
-      const demoResult = await callDemoAI('data extraction', req.body.pdfText || '');
-      res.json(JSON.parse(demoResult));
-    } catch (demoErr: any) {
-      res.status(500).json({ error: 'LinkedIn import failed' });
-    }
+    res.status(500).json({ error: err.message });
   }
 });
 
