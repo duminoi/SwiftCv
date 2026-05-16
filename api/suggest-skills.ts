@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { callAI } from './zen';
+import { callAI, safeParseJSON } from './zen';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -14,8 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `Current skills: ${(currentSkills || []).join(', ')}\nSummary: ${summary || 'N/A'}\nExperience:\n${JSON.stringify(experiences, null, 2)}`
     );
 
-    const cleaned = result.replace(/```(?:json)?\s*/gi, '').trim();
-    return res.status(200).json(JSON.parse(cleaned));
+    return res.status(200).json(safeParseJSON(result));
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
