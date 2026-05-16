@@ -44,7 +44,7 @@ export interface CVData {
   skills: string[];
 }
 
-export type TemplateType = 'executive' | 'tech' | 'creative' | 'standard' | 'modern' | 'timeline';
+export type TemplateType = 'executive' | 'tech' | 'creative' | 'standard' | 'modern' | 'timeline' | 'elegant' | 'professional' | 'vibrant' | 'compact' | 'academic' | 'gradient' | 'nature' | 'bold' | 'sidebar' | 'minimal';
 export type FontType = 'sans' | 'serif' | 'mono';
 export type UserTier = 'free' | 'pro' | 'business' | 'lifetime';
 

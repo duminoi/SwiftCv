@@ -9,6 +9,16 @@ import { PixelsTemplate } from './components/templates/PixelsTemplate';
 import { CreativeTemplate } from './components/templates/CreativeTemplate';
 import { ModernTemplate } from './components/templates/ModernTemplate';
 import { TimelineTemplate } from './components/templates/TimelineTemplate';
+import { ElegantTemplate } from './components/templates/ElegantTemplate';
+import { ProfessionalTemplate } from './components/templates/ProfessionalTemplate';
+import { VibrantTemplate } from './components/templates/VibrantTemplate';
+import { CompactTemplate } from './components/templates/CompactTemplate';
+import { AcademicTemplate } from './components/templates/AcademicTemplate';
+import { GradientTemplate } from './components/templates/GradientTemplate';
+import { NatureTemplate } from './components/templates/NatureTemplate';
+import { BoldTemplate } from './components/templates/BoldTemplate';
+import { SidebarTemplate } from './components/templates/SidebarTemplate';
+import { MinimalTemplate } from './components/templates/MinimalTemplate';
 import { RichTextEditor } from './components/RichTextEditor';
 import { analyzeCV as apiAnalyze, rewriteSummary, rewriteBullets, suggestSkills, generateSummary, matchJD, saveCVToCloud, generateCoverLetter, createCheckoutSession, importLinkedIn } from './services/api';
 import './i18n';
@@ -143,6 +153,19 @@ function App() {
   const [showCvMenu, setShowCvMenu] = useState(false);
   const [renamingCv, setRenamingCv] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const cvMenuRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (cvMenuRef.current && !cvMenuRef.current.contains(e.target as Node)) {
+        setShowCvMenu(false);
+      }
+    };
+    if (showCvMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showCvMenu]);
 
 
   const [coverLetterForm, setCoverLetterForm] = useState<{ companyName: string; jobTitle: string; tone: 'professional' | 'modern' }>({ companyName: '', jobTitle: '', tone: 'professional' });
@@ -1083,6 +1106,66 @@ function App() {
             tags: ['Timeline', 'Chronological'],
             colors: ['#059669', '#f0fdf4', '#ffffff'],
             layout: 'centered'
+          },
+          {
+            id: 'elegant', name: 'The Elegant Gold',
+            tags: ['Luxury', 'Gold', 'Premium'],
+            colors: ['#1C1917', '#D4AF37', '#FAFAF9'],
+            layout: 'centered'
+          },
+          {
+            id: 'professional', name: 'The Corporate Navy',
+            tags: ['Corporate', 'Navy', 'Premium'],
+            colors: ['#0F172A', '#1E40AF', '#F8FAFC'],
+            layout: '2-col'
+          },
+          {
+            id: 'vibrant', name: 'The Vibrant Pulse',
+            tags: ['Vibrant', 'Bold', 'Premium'],
+            colors: ['#EC4899', '#06B6D4', '#FDF2F8'],
+            layout: 'asymmetric'
+          },
+          {
+            id: 'compact', name: 'The Compact Pro',
+            tags: ['Compact', 'Dense', 'Premium'],
+            colors: ['#334155', '#475569', '#F8FAFC'],
+            layout: '2-col'
+          },
+          {
+            id: 'academic', name: 'The Academic Scholar',
+            tags: ['Academic', 'Clean', 'Premium'],
+            colors: ['#0D9488', '#2DD4BF', '#F0FDFA'],
+            layout: '2-col'
+          },
+          {
+            id: 'gradient', name: 'The Gradient Flow',
+            tags: ['Gradient', 'Sleek', 'Premium'],
+            colors: ['#2563EB', '#7C3AED', '#F8FAFC'],
+            layout: 'sidebar'
+          },
+          {
+            id: 'nature', name: 'The Natural Green',
+            tags: ['Nature', 'Eco', 'Premium'],
+            colors: ['#2E8B57', '#87CEEB', '#F0FFF4'],
+            layout: 'centered'
+          },
+          {
+            id: 'bold', name: 'The Bold Statement',
+            tags: ['Bold', 'Impact', 'Premium'],
+            colors: ['#DC2626', '#1E293B', '#FEF2F2'],
+            layout: 'asymmetric'
+          },
+          {
+            id: 'sidebar', name: 'The Sidebar Classic',
+            tags: ['Sidebar', 'Clean', 'Premium'],
+            colors: ['#0891B2', '#22D3EE', '#ECFEFF'],
+            layout: 'sidebar'
+          },
+          {
+            id: 'minimal', name: 'The Ultra Minimal',
+            tags: ['Minimal', 'Mono', 'Premium'],
+            colors: ['#18181B', '#3F3F46', '#FAFAFA'],
+            layout: 'centered'
           }
         ];
         return (
@@ -1093,7 +1176,7 @@ function App() {
                 <p className="font-body-md text-body-md text-on-surface-variant">Choose a design for your CV.</p>
               </div>
               <div className="text-xs text-on-surface-variant bg-surface-variant/50 px-3 py-1.5 rounded-full font-medium">
-                {currentTemplate === 'standard' ? 'Standard' : currentTemplate === 'executive' ? 'Executive' : currentTemplate === 'tech' ? 'Tech' : 'Creative'} selected
+                {currentTemplate === 'standard' ? 'Standard' : currentTemplate === 'executive' ? 'Executive' : currentTemplate === 'tech' ? 'Tech' : currentTemplate === 'creative' ? 'Creative' : currentTemplate === 'modern' ? 'Modern' : currentTemplate === 'timeline' ? 'Timeline' : currentTemplate === 'elegant' ? 'Elegant' : currentTemplate === 'professional' ? 'Professional' : currentTemplate === 'vibrant' ? 'Vibrant' : currentTemplate === 'compact' ? 'Compact' : currentTemplate === 'academic' ? 'Academic' : currentTemplate === 'gradient' ? 'Gradient' : currentTemplate === 'nature' ? 'Nature' : currentTemplate === 'bold' ? 'Bold' : currentTemplate === 'sidebar' ? 'Sidebar' : currentTemplate === 'minimal' ? 'Minimal' : 'Template'} selected
               </div>
             </div>
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
@@ -1332,9 +1415,9 @@ function App() {
       case 'pricing':
         const tiers = [
           { id: 'free', name: 'Free', price: '$0', description: 'Get started with basic features', features: ['1 CV', '5 AI analyses/month', '2 templates', 'PDF with watermark'] },
-          { id: 'pro', name: 'Pro', price: '$7.99', period: '/month', description: 'For serious job seekers', features: ['Unlimited CVs', 'Unlimited AI analyses', 'All 4 templates', 'Clean PDF export', 'JD Matching', 'JSON export', 'Priority support'], popular: true },
-          { id: 'business', name: 'Business', price: '$14.99', period: '/month', description: 'For professionals & teams', features: ['Everything in Pro', '10+ templates', 'Priority AI', 'Cover letter builder', 'Team sharing'], popular: false },
-          { id: 'lifetime', name: 'Lifetime', price: '$129', period: ' once', description: 'Pay once, own forever', features: ['Everything in Pro', 'All future updates', 'Lifetime access', 'Premium templates'], popular: false },
+          { id: 'pro', name: 'Pro', price: '$7.99', period: '/month', description: 'For serious job seekers', features: ['Unlimited CVs', 'Unlimited AI analyses', 'All 6 templates', 'Clean PDF export', 'JD Matching', 'JSON export', 'Priority support'], popular: true },
+          { id: 'business', name: 'Business', price: '$14.99', period: '/month', description: 'For professionals & teams', features: ['Everything in Pro', '16 templates total', 'Premium AI models', 'Cover letter builder', 'Team sharing'], popular: false },
+          { id: 'lifetime', name: 'Lifetime', price: '$129', period: ' once', description: 'Pay once, own forever', features: ['Everything in Pro', 'All future updates', 'Lifetime access', 'All 16 templates'], popular: false },
         ];
         return (
           <div className="space-y-8 animate-in fade-in duration-300 max-w-6xl mx-auto">
@@ -1543,82 +1626,84 @@ function App() {
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="text-primary font-bold text-lg sm:text-xl tracking-tight shrink-0">SwiftCv</div>
           <div className="w-px h-5 sm:h-6 bg-surface-variant hidden sm:block"></div>
-          <div className="relative hidden sm:block">
-            <button
-              onClick={() => setShowCvMenu(!showCvMenu)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-surface-variant/50 transition-colors text-sm font-medium text-on-surface"
-            >
-              <Icon name="description" className="text-[18px] text-primary" />
-              <span className="max-w-[120px] truncate">{cvs.find(c => c.id === currentCvId)?.name || 'My CV'}</span>
-              <Icon name="expand_more" className="text-[16px] text-on-surface-variant" />
-            </button>
-            {showCvMenu && (
-              <div className="absolute top-full left-0 mt-1 w-64 bg-surface border border-outline-variant rounded-xl shadow-xl z-50 py-2 max-h-64 overflow-y-auto">
-                {cvs.map(cv => (
-                  <div key={cv.id} className="flex items-center gap-1 px-3 py-2 hover:bg-surface-variant/50 group">
-                    {renamingCv === cv.id ? (
-                      <input
-                        value={renameValue}
-                        onChange={e => setRenameValue(e.target.value)}
-                        onBlur={() => handleFinishRename(cv.id)}
-                        onKeyDown={e => e.key === 'Enter' && handleFinishRename(cv.id)}
-                        className="flex-1 text-sm px-2 py-0.5 rounded border border-outline bg-transparent focus:border-primary focus:outline-none"
-                        autoFocus
-                      />
-                    ) : (
-                      <button
-                        onClick={() => { switchCV(cv.id); setShowCvMenu(false); }}
-                        className={`flex-1 text-left text-sm ${currentCvId === cv.id ? 'font-bold text-primary' : 'text-on-surface'}`}
-                      >
-                        {cv.name}
-                      </button>
-                    )}
-                    {currentCvId === cv.id && <Icon name="check" className="text-[14px] text-primary shrink-0" />}
-                    <button onClick={() => handleStartRename(cv.id, cv.name)} className="opacity-0 group-hover:opacity-100 text-[12px] text-on-surface-variant hover:text-primary p-0.5">
-                      <Icon name="edit" className="text-[14px]" />
-                    </button>
-                    {cvs.length > 1 && (
-                      <button onClick={() => handleDeleteCV(cv.id)} className="opacity-0 group-hover:opacity-100 text-[12px] text-on-surface-variant hover:text-error p-0.5">
-                        <Icon name="delete" className="text-[14px]" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <div className="border-t border-outline-variant my-1"></div>
-                <button onClick={handleCreateCV} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-surface-variant/50">
-                  <Icon name="add" className="text-[16px]" /> New CV
-                </button>
-              </div>
-            )}
-          </div>
-          {/* Mobile CV selector */}
-          <button
-            onClick={() => setShowCvMenu(!showCvMenu)}
-            className="sm:hidden flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-surface-variant/50 transition-colors text-xs font-medium text-on-surface"
-          >
-            <Icon name="description" className="text-[16px] text-primary" />
-            <span className="max-w-[80px] truncate">{cvs.find(c => c.id === currentCvId)?.name || 'My CV'}</span>
-            <Icon name="expand_more" className="text-[14px] text-on-surface-variant" />
-          </button>
-          {showCvMenu && (
-            <div className="sm:hidden absolute top-[64px] left-0 right-0 mt-1 mx-3 w-auto bg-surface border border-outline-variant rounded-xl shadow-xl z-50 py-2 max-h-64 overflow-y-auto">
-              {cvs.map(cv => (
-                <div key={cv.id} className="flex items-center gap-1 px-3 py-2 hover:bg-surface-variant/50">
-                  <button
-                    onClick={() => { switchCV(cv.id); setShowCvMenu(false); }}
-                    className={`flex-1 text-left text-sm ${currentCvId === cv.id ? 'font-bold text-primary' : 'text-on-surface'}`}
-                  >
-                    {cv.name}
-                  </button>
-                  {currentCvId === cv.id && <Icon name="check" className="text-[14px] text-primary shrink-0" />}
-                </div>
-              ))}
-              <div className="border-t border-outline-variant my-1"></div>
-              <button onClick={handleCreateCV} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-surface-variant/50">
-                <Icon name="add" className="text-[16px]" /> New CV
-              </button>
-            </div>
-          )}
+           <div className="relative hidden sm:block" ref={cvMenuRef}>
+             <button
+               onClick={() => setShowCvMenu(!showCvMenu)}
+               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-surface-variant/50 transition-colors text-sm font-medium text-on-surface"
+             >
+               <Icon name="description" className="text-[18px] text-primary" />
+               <span className="max-w-[120px] truncate">{cvs.find(c => c.id === currentCvId)?.name || 'My CV'}</span>
+               <Icon name="expand_more" className={`text-[16px] text-on-surface-variant transition-transform ${showCvMenu ? 'rotate-180' : ''}`} />
+             </button>
+             {showCvMenu && (
+               <div className="absolute top-full left-0 mt-1 w-56 bg-surface border border-outline-variant rounded-lg shadow-lg z-50 py-1 max-h-64 overflow-y-auto">
+                 {cvs.map(cv => (
+                   <div key={cv.id} className="flex items-center gap-1 px-3 py-2 hover:bg-surface-variant/50 group cursor-pointer">
+                     {renamingCv === cv.id ? (
+                       <input
+                         value={renameValue}
+                         onChange={e => setRenameValue(e.target.value)}
+                         onBlur={() => handleFinishRename(cv.id)}
+                         onKeyDown={e => e.key === 'Enter' && handleFinishRename(cv.id)}
+                         className="flex-1 text-sm px-2 py-0.5 rounded border border-outline bg-transparent focus:border-primary focus:outline-none"
+                         autoFocus
+                       />
+                     ) : (
+                       <button
+                         onClick={() => { switchCV(cv.id); setShowCvMenu(false); }}
+                         className={`flex-1 text-left text-sm ${currentCvId === cv.id ? 'font-bold text-primary' : 'text-on-surface'}`}
+                       >
+                         {cv.name}
+                       </button>
+                     )}
+                     {currentCvId === cv.id && <Icon name="check" className="text-[14px] text-primary shrink-0" />}
+                     <button onClick={() => handleStartRename(cv.id, cv.name)} className="opacity-0 group-hover:opacity-100 text-[12px] text-on-surface-variant hover:text-primary p-0.5">
+                       <Icon name="edit" className="text-[14px]" />
+                     </button>
+                     {cvs.length > 1 && (
+                       <button onClick={() => handleDeleteCV(cv.id)} className="opacity-0 group-hover:opacity-100 text-[12px] text-on-surface-variant hover:text-error p-0.5">
+                         <Icon name="delete" className="text-[14px]" />
+                       </button>
+                     )}
+                   </div>
+                 ))}
+                 <div className="border-t border-outline-variant my-1"></div>
+                 <button onClick={handleCreateCV} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-surface-variant/50">
+                   <Icon name="add" className="text-[16px]" /> New CV
+                 </button>
+               </div>
+             )}
+           </div>
+           {/* Mobile CV selector */}
+           <div className="sm:hidden relative" ref={cvMenuRef}>
+             <button
+               onClick={() => setShowCvMenu(!showCvMenu)}
+               className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-surface-variant/50 transition-colors text-xs font-medium text-on-surface"
+             >
+               <Icon name="description" className="text-[16px] text-primary" />
+               <span className="max-w-[80px] truncate">{cvs.find(c => c.id === currentCvId)?.name || 'My CV'}</span>
+               <Icon name="expand_more" className={`text-[14px] text-on-surface-variant transition-transform ${showCvMenu ? 'rotate-180' : ''}`} />
+             </button>
+             {showCvMenu && (
+               <div className="absolute top-full left-0 mt-1 w-48 bg-surface border border-outline-variant rounded-lg shadow-lg z-50 py-1 max-h-64 overflow-y-auto">
+                 {cvs.map(cv => (
+                   <div key={cv.id} className="flex items-center gap-1 px-3 py-2 hover:bg-surface-variant/50 cursor-pointer">
+                     <button
+                       onClick={() => { switchCV(cv.id); setShowCvMenu(false); }}
+                       className={`flex-1 text-left text-sm ${currentCvId === cv.id ? 'font-bold text-primary' : 'text-on-surface'}`}
+                     >
+                       {cv.name}
+                     </button>
+                     {currentCvId === cv.id && <Icon name="check" className="text-[14px] text-primary shrink-0" />}
+                   </div>
+                 ))}
+                 <div className="border-t border-outline-variant my-1"></div>
+                 <button onClick={handleCreateCV} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-surface-variant/50">
+                   <Icon name="add" className="text-[16px]" /> New CV
+                 </button>
+               </div>
+             )}
+           </div>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
           <input
@@ -1871,6 +1956,16 @@ function App() {
             {currentTemplate === 'creative' && <CreativeTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
             {currentTemplate === 'modern' && <ModernTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
             {currentTemplate === 'timeline' && <TimelineTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'elegant' && <ElegantTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'professional' && <ProfessionalTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'vibrant' && <VibrantTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'compact' && <CompactTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'academic' && <AcademicTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'gradient' && <GradientTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'nature' && <NatureTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'bold' && <BoldTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'sidebar' && <SidebarTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
+            {currentTemplate === 'minimal' && <MinimalTemplate data={data} primaryColor={primaryColor} fontFamily={fontFamily} />}
           </div>
           <div className="h-12 sm:h-16 w-full shrink-0 no-print"></div>
         </section>
