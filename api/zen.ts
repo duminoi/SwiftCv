@@ -294,7 +294,8 @@ async function callZen(system: string, user: string, apiKey: string): Promise<st
     throw new Error(`Zen API returned invalid JSON: ${rawText.substring(0, 200)}`);
   }
 
-  const content = data?.choices?.[0]?.message?.content || '';
+  const msg = data?.choices?.[0]?.message || {};
+  let content = msg.content || msg.reasoning || '';
   console.log(`[Zen API] Response content length: ${content.length}`);
   
   // Check for truncated response (ends mid-JSON)
@@ -312,9 +313,10 @@ async function callZen(system: string, user: string, apiKey: string): Promise<st
   return content;
 }
 
-// ── Fallback: gọi OpenRouter (dùng Gemini Flash free) ──
+// ── Fallback: gọi OpenRouter ──
 async function callOpenRouter(system: string, user: string, routerKey: string): Promise<string> {
-  console.log('[OpenRouter] Calling OpenRouter API...');
+  const model = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-v4-flash:free';
+  console.log(`[OpenRouter] Calling OpenRouter API with model ${model}...`);
   
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -323,7 +325,7 @@ async function callOpenRouter(system: string, user: string, routerKey: string): 
       'Authorization': `Bearer ${routerKey}`,
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.0-flash-exp:free',
+      model,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
@@ -340,13 +342,14 @@ async function callOpenRouter(system: string, user: string, routerKey: string): 
   }
   
   const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content || '';
+  const msg = data?.choices?.[0]?.message || {};
+  let content = msg.content || msg.reasoning || '';
   
   // Check for truncated response
   const finishReason = data?.choices?.[0]?.finish_reason;
   if (finishReason === 'length') {
     console.warn('[OpenRouter] Response was truncated (max_tokens reached), retrying...');
-    throw new Error('AI response truncated - retrying');
+    throw new Error('OpenRouter response truncated - retrying');
   }
   
   if (!content || !content.trim()) {

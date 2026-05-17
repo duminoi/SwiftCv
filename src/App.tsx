@@ -20,6 +20,9 @@ import { BoldTemplate } from './components/templates/BoldTemplate';
 import { SidebarTemplate } from './components/templates/SidebarTemplate';
 import { MinimalTemplate } from './components/templates/MinimalTemplate';
 import { RichTextEditor } from './components/RichTextEditor';
+import { TemplateOnboarding } from './components/TemplateOnboarding';
+import { TEMPLATE_META, CATEGORY_LABELS, CATEGORY_ORDER } from './data/templateMeta';
+import type { TemplateCategory } from './data/templateMeta';
 import { analyzeCV as apiAnalyze, rewriteSummary, rewriteBullets, suggestSkills, generateSummary, matchJD, saveCVToCloud, generateCoverLetter, createCheckoutSession, importLinkedIn } from './services/api';
 import './i18n';
 
@@ -130,8 +133,11 @@ function App() {
     usageCount,
   } = useCVStore();
   
-  const [activeTab, setActiveTab] = useState<'personal' | 'experience' | 'education' | 'skills' | 'analysis' | 'templates' | 'settings' | 'match' | 'coverletter' | 'jobtracker' | 'pricing'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'experience' | 'education' | 'skills' | 'analysis' | 'design' | 'settings' | 'match' | 'coverletter' | 'jobtracker' | 'pricing'>('design');
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [newSkill, setNewSkill] = useState('');
+  const [templateFilter, setTemplateFilter] = useState<TemplateCategory>('all');
+  const [showTemplateSwitcher, setShowTemplateSwitcher] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
@@ -154,6 +160,19 @@ function App() {
   const [renamingCv, setRenamingCv] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const cvMenuRef = useRef<HTMLDivElement>(null);
+  const templateSwitcherRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (templateSwitcherRef.current && !templateSwitcherRef.current.contains(e.target as Node)) {
+        setShowTemplateSwitcher(false);
+      }
+    };
+    if (showTemplateSwitcher) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showTemplateSwitcher]);
 
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -279,7 +298,7 @@ function App() {
   }, [data, currentTemplate, primaryColor, fontFamily]);
 
   const handleCreateCV = () => {
-    createCV(`CV #${cvs.length + 1}`);
+    setShowOnboarding(true);
     setShowCvMenu(false);
   };
 
@@ -441,7 +460,7 @@ function App() {
     }
   };
 
-  const formTabs = [
+  const contentTabs = [
     { id: 'personal', label: t('sections.personal'), icon: 'person', short: 'Info' },
     { id: 'experience', label: t('sections.experience'), icon: 'work', short: 'Work' },
     { id: 'education', label: t('sections.education'), icon: 'school', short: 'Edu' },
@@ -451,8 +470,10 @@ function App() {
     { id: 'analysis', label: 'AI Analysis', icon: 'insights', short: 'AI' },
     { id: 'match', label: 'Job Match', icon: 'search_insights', short: 'Match' },
     { id: 'jobtracker', label: 'Job Tracker', icon: 'track_changes', short: 'Jobs' },
-    { id: 'templates', label: 'Templates', icon: 'palette', short: 'Theme' },
     { id: 'coverletter', label: 'Cover Letter', icon: 'article', short: 'Cover' },
+  ];
+  const designTabs = [
+    { id: 'design', label: t('sections.design') || 'Design', icon: 'palette', short: 'Design' },
     { id: 'settings', label: t('sections.settings'), icon: 'settings', short: 'Setup' },
     { id: 'pricing', label: 'Upgrade', icon: 'workspace_premium', short: 'Pro' },
   ];
@@ -1069,199 +1090,144 @@ function App() {
           </div>
         );
 
-      case 'templates':
-        const templates = [
-          {
-            id: 'standard', name: 'The International Standard',
-            tags: ['ATS', 'Corporate'],
-            colors: ['#0061a4', '#d1e4ff', '#ffffff'],
-            layout: '2-col'
-          },
-          {
-            id: 'executive', name: 'The Minimalist CEO',
-            tags: ['Executive', 'Serif'],
-            colors: ['#1e293b', '#f8f9ff', '#ffffff'],
-            layout: 'centered'
-          },
-          {
-            id: 'tech', name: 'The Pixels Code',
-            tags: ['Modern', 'Dark'],
-            colors: ['#0f172a', '#1e293b', '#ffffff'],
-            layout: 'sidebar'
-          },
-          {
-            id: 'creative', name: 'The Creative Portfolio',
-            tags: ['Creative', 'Bold'],
-            colors: ['#6b5778', '#f3daff', '#ffffff'],
-            layout: 'asymmetric'
-          },
-          {
-            id: 'modern', name: 'The Modern Edge',
-            tags: ['Modern', '2-Column'],
-            colors: ['#2563eb', '#f8fafc', '#ffffff'],
-            layout: '2-col'
-          },
-          {
-            id: 'timeline', name: 'The Timeline Pro',
-            tags: ['Timeline', 'Chronological'],
-            colors: ['#059669', '#f0fdf4', '#ffffff'],
-            layout: 'centered'
-          },
-          {
-            id: 'elegant', name: 'The Elegant Gold',
-            tags: ['Luxury', 'Gold', 'Premium'],
-            colors: ['#1C1917', '#D4AF37', '#FAFAF9'],
-            layout: 'centered'
-          },
-          {
-            id: 'professional', name: 'The Corporate Navy',
-            tags: ['Corporate', 'Navy', 'Premium'],
-            colors: ['#0F172A', '#1E40AF', '#F8FAFC'],
-            layout: '2-col'
-          },
-          {
-            id: 'vibrant', name: 'The Vibrant Pulse',
-            tags: ['Vibrant', 'Bold', 'Premium'],
-            colors: ['#EC4899', '#06B6D4', '#FDF2F8'],
-            layout: 'asymmetric'
-          },
-          {
-            id: 'compact', name: 'The Compact Pro',
-            tags: ['Compact', 'Dense', 'Premium'],
-            colors: ['#334155', '#475569', '#F8FAFC'],
-            layout: '2-col'
-          },
-          {
-            id: 'academic', name: 'The Academic Scholar',
-            tags: ['Academic', 'Clean', 'Premium'],
-            colors: ['#0D9488', '#2DD4BF', '#F0FDFA'],
-            layout: '2-col'
-          },
-          {
-            id: 'gradient', name: 'The Gradient Flow',
-            tags: ['Gradient', 'Sleek', 'Premium'],
-            colors: ['#2563EB', '#7C3AED', '#F8FAFC'],
-            layout: 'sidebar'
-          },
-          {
-            id: 'nature', name: 'The Natural Green',
-            tags: ['Nature', 'Eco', 'Premium'],
-            colors: ['#2E8B57', '#87CEEB', '#F0FFF4'],
-            layout: 'centered'
-          },
-          {
-            id: 'bold', name: 'The Bold Statement',
-            tags: ['Bold', 'Impact', 'Premium'],
-            colors: ['#DC2626', '#1E293B', '#FEF2F2'],
-            layout: 'asymmetric'
-          },
-          {
-            id: 'sidebar', name: 'The Sidebar Classic',
-            tags: ['Sidebar', 'Clean', 'Premium'],
-            colors: ['#0891B2', '#22D3EE', '#ECFEFF'],
-            layout: 'sidebar'
-          },
-          {
-            id: 'minimal', name: 'The Ultra Minimal',
-            tags: ['Minimal', 'Mono', 'Premium'],
-            colors: ['#18181B', '#3F3F46', '#FAFAFA'],
-            layout: 'centered'
-          }
-        ];
+      case 'design':
+        const allTemplates = Object.values(TEMPLATE_META);
+        const filteredDesign = templateFilter === 'all'
+          ? allTemplates
+          : allTemplates.filter((t) => t.category.includes(templateFilter));
+        const isLockedTemplate = (t: typeof allTemplates[0]) => {
+          if (userTier !== 'free') return false;
+          return t.isPremium;
+        };
         return (
-          <div className="space-y-8 animate-in fade-in duration-300">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-headline-md text-headline-md text-on-surface mb-2">Templates</h2>
-                <p className="font-body-md text-body-md text-on-surface-variant">Choose a design for your CV.</p>
-              </div>
-              <div className="text-xs text-on-surface-variant bg-surface-variant/50 px-3 py-1.5 rounded-full font-medium">
-                {currentTemplate === 'standard' ? 'Standard' : currentTemplate === 'executive' ? 'Executive' : currentTemplate === 'tech' ? 'Tech' : currentTemplate === 'creative' ? 'Creative' : currentTemplate === 'modern' ? 'Modern' : currentTemplate === 'timeline' ? 'Timeline' : currentTemplate === 'elegant' ? 'Elegant' : currentTemplate === 'professional' ? 'Professional' : currentTemplate === 'vibrant' ? 'Vibrant' : currentTemplate === 'compact' ? 'Compact' : currentTemplate === 'academic' ? 'Academic' : currentTemplate === 'gradient' ? 'Gradient' : currentTemplate === 'nature' ? 'Nature' : currentTemplate === 'bold' ? 'Bold' : currentTemplate === 'sidebar' ? 'Sidebar' : currentTemplate === 'minimal' ? 'Minimal' : 'Template'} selected
-              </div>
+          <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
+            <div>
+              <h2 className="font-headline-md text-headline-md text-on-surface mb-2">{t('sections.design')}</h2>
+              <p className="font-body-md text-body-md text-on-surface-variant">Choose a design for your CV.</p>
             </div>
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-              {templates.map(t => (
+
+            {/* Filter bar */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              {CATEGORY_ORDER.map((cat) => (
                 <button
-                  key={t.id}
-                  onClick={() => setTemplate(t.id as any)}
-                  className={`group relative rounded-2xl overflow-hidden transition-all duration-300 text-left ${
-                    currentTemplate === t.id 
-                      ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface shadow-lg shadow-primary/10' 
-                      : 'border border-outline-variant hover:border-primary/50 hover:shadow-md'
+                  key={cat}
+                  onClick={() => setTemplateFilter(cat)}
+                  className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                    templateFilter === cat
+                      ? 'bg-primary text-on-primary shadow-md shadow-primary/20'
+                      : 'bg-surface-container-low text-on-surface-variant border border-outline-variant hover:border-primary/40 hover:text-on-surface'
                   }`}
                 >
-                  {/* Mini preview */}
-                  <div className="h-28 bg-white p-3 flex items-start gap-1.5 relative overflow-hidden">
-                    {/* Layout representation */}
-                    {t.layout === '2-col' && (
-                      <>
-                        <div className="w-1/3 h-full rounded bg-[#d1e4ff]/40 flex flex-col gap-1 p-1.5">
-                          <div className="h-1.5 rounded-full bg-[#0061a4]/20 w-3/4"></div>
-                          <div className="h-1 rounded-full bg-[#0061a4]/10 w-1/2"></div>
-                          <div className="h-1 rounded-full bg-[#0061a4]/10 w-2/3"></div>
-                        </div>
-                        <div className="flex-1 flex flex-col gap-1 p-1.5">
-                          <div className="h-2 rounded bg-gray-200 w-1/2"></div>
-                          <div className="h-1 rounded bg-gray-100 w-full"></div>
-                          <div className="h-1 rounded bg-gray-100 w-full"></div>
-                          <div className="h-1 rounded bg-gray-100 w-3/4"></div>
-                        </div>
-                      </>
-                    )}
-                    {t.layout === 'centered' && (
-                      <div className="w-full flex flex-col items-center gap-1.5 p-2">
-                        <div className="h-2 rounded bg-gray-300 w-1/3"></div>
-                        <div className="h-1 rounded bg-gray-200 w-1/4"></div>
-                        <div className="w-full h-px bg-gray-200 my-1"></div>
-                        <div className="h-1 rounded bg-gray-100 w-full"></div>
-                        <div className="h-1 rounded bg-gray-100 w-full"></div>
-                        <div className="h-1 rounded bg-gray-100 w-2/3"></div>
-                      </div>
-                    )}
-                    {t.layout === 'sidebar' && (
-                      <>
-                        <div className="w-[30%] h-full rounded bg-[#0f172a] flex flex-col gap-1 p-1.5">
-                          <div className="h-1.5 rounded bg-white/20 w-3/4"></div>
-                          <div className="h-1 rounded bg-white/10 w-full"></div>
-                        </div>
-                        <div className="flex-1 flex flex-col gap-1 p-1.5">
-                          <div className="h-2 rounded bg-gray-200 w-1/2"></div>
-                          <div className="h-1 rounded bg-gray-100 w-full"></div>
-                          <div className="h-1 rounded bg-gray-100 w-full"></div>
-                        </div>
-                      </>
-                    )}
-                    {t.layout === 'asymmetric' && (
-                      <div className="w-full flex gap-1.5 p-1.5">
-                        <div className="flex-1 flex flex-col gap-1">
-                          <div className="h-2 rounded bg-gray-300 w-3/4"></div>
-                          <div className="h-1 rounded bg-gray-100 w-full"></div>
-                          <div className="h-1 rounded bg-gray-100 w-full"></div>
-                        </div>
-                        <div className="w-1/4 h-full rounded bg-[#6b5778]/20 flex flex-col gap-1 p-1">
-                          <div className="h-1 rounded bg-[#6b5778]/10 w-full"></div>
-                          <div className="h-1 rounded bg-[#6b5778]/10 w-full"></div>
-                        </div>
-                      </div>
-                    )}
-                    {/* Selected checkmark */}
-                    {currentTemplate === t.id && (
-                      <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-sm">
-                        <Icon name="check" className="text-[12px] text-on-primary" />
-                      </div>
-                    )}
-                  </div>
-                  {/* Info */}
-                  <div className="p-3 bg-surface">
-                    <div className="font-title-md text-title-md text-on-surface font-bold group-hover:text-primary transition-colors">{t.name}</div>
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      {t.tags.map(tag => (
-                        <span key={tag} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant uppercase tracking-wider">{tag}</span>
-                      ))}
-                    </div>
-                  </div>
+                  {CATEGORY_LABELS[cat]}
                 </button>
               ))}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+              {filteredDesign.map((t) => {
+                const locked = isLockedTemplate(t);
+                const isSelected = currentTemplate === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => !locked && setTemplate(t.id as any)}
+                    disabled={locked}
+                    className={`group relative rounded-2xl overflow-hidden text-left transition-all duration-300 ${
+                      isSelected
+                        ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface shadow-xl shadow-primary/10 scale-[1.02]'
+                        : locked
+                        ? 'opacity-60 cursor-not-allowed border border-outline-variant'
+                        : 'border border-outline-variant hover:border-primary/40 hover:shadow-lg hover:shadow-black/5 hover:-translate-y-1'
+                    }`}
+                  >
+                    <div className="h-36 sm:h-44 bg-white relative overflow-hidden">
+                      {/* Mini preview using layout */}
+                      {t.layout === '2-col' && (
+                        <div className="w-full h-full flex gap-1.5 p-2" style={{ background: t.colors[2] || '#fff' }}>
+                          <div className="w-[35%] h-full rounded-md flex flex-col gap-1 p-1.5" style={{ background: t.colors[1] + '30' }}>
+                            <div className="h-2 rounded-full w-3/4" style={{ background: t.colors[0] + '40' }}></div>
+                            <div className="h-1.5 rounded-full w-1/2" style={{ background: t.colors[0] + '25' }}></div>
+                            <div className="h-1.5 rounded-full w-2/3" style={{ background: t.colors[0] + '25' }}></div>
+                          </div>
+                          <div className="flex-1 flex flex-col gap-1 p-1">
+                            <div className="h-2.5 rounded w-1/2" style={{ background: '#e2e8f0' }}></div>
+                            <div className="h-1.5 rounded w-full" style={{ background: '#f1f5f9' }}></div>
+                            <div className="h-1.5 rounded w-full" style={{ background: '#f1f5f9' }}></div>
+                            <div className="h-1.5 rounded w-3/4" style={{ background: '#f1f5f9' }}></div>
+                          </div>
+                        </div>
+                      )}
+                      {t.layout === 'sidebar' && (
+                        <div className="w-full h-full flex gap-1.5 p-2" style={{ background: t.colors[2] || '#fff' }}>
+                          <div className="w-[30%] h-full rounded-md flex flex-col gap-1 p-1.5" style={{ background: t.colors[0] }}>
+                            <div className="h-2 rounded-full w-3/4" style={{ background: 'rgba(255,255,255,0.2)' }}></div>
+                            <div className="h-1.5 rounded-full w-full" style={{ background: 'rgba(255,255,255,0.12)' }}></div>
+                          </div>
+                          <div className="flex-1 flex flex-col gap-1 p-1">
+                            <div className="h-2.5 rounded w-1/2" style={{ background: '#e2e8f0' }}></div>
+                            <div className="h-1.5 rounded w-full" style={{ background: '#f1f5f9' }}></div>
+                            <div className="h-1.5 rounded w-full" style={{ background: '#f1f5f9' }}></div>
+                          </div>
+                        </div>
+                      )}
+                      {t.layout === 'asymmetric' && (
+                        <div className="w-full h-full flex gap-1.5 p-2" style={{ background: t.colors[2] || '#fff' }}>
+                          <div className="flex-1 flex flex-col gap-1">
+                            <div className="h-2.5 rounded w-3/4" style={{ background: '#e2e8f0' }}></div>
+                            <div className="h-1.5 rounded w-full" style={{ background: '#f1f5f9' }}></div>
+                            <div className="h-1.5 rounded w-full" style={{ background: '#f1f5f9' }}></div>
+                          </div>
+                          <div className="w-[28%] h-full rounded-md flex flex-col gap-1 p-1" style={{ background: t.colors[1] + '35' }}>
+                            <div className="h-1.5 rounded w-full" style={{ background: t.colors[0] + '20' }}></div>
+                            <div className="h-1.5 rounded w-full" style={{ background: t.colors[0] + '20' }}></div>
+                          </div>
+                        </div>
+                      )}
+                      {t.layout === 'centered' && (
+                        <div className="w-full h-full flex flex-col items-center gap-1.5 p-2" style={{ background: t.colors[2] || '#fff' }}>
+                          <div className="h-2.5 rounded w-1/3" style={{ background: '#e2e8f0' }}></div>
+                          <div className="h-1.5 rounded w-1/4" style={{ background: t.colors[0] + '35' }}></div>
+                          <div className="w-full h-px my-1" style={{ background: '#e2e8f0' }}></div>
+                          <div className="h-1.5 rounded w-full" style={{ background: '#f1f5f9' }}></div>
+                          <div className="h-1.5 rounded w-full" style={{ background: '#f1f5f9' }}></div>
+                          <div className="h-1.5 rounded w-2/3" style={{ background: '#f1f5f9' }}></div>
+                        </div>
+                      )}
+                      {isSelected && (
+                        <div className="absolute inset-0 bg-primary/5 flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                            <Icon name="check" className="text-[20px] text-on-primary" />
+                          </div>
+                        </div>
+                      )}
+                      {locked && (
+                        <div className="absolute inset-0 bg-surface/60 backdrop-blur-[2px] flex items-center justify-center">
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface border border-outline-variant shadow-sm">
+                            <Icon name="workspace_premium" className="text-[14px] text-amber-500" />
+                            <span className="text-xs font-medium text-on-surface">Pro</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4 bg-surface">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className={`font-semibold text-sm sm:text-base group-hover:text-primary transition-colors ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
+                          {t.name}
+                        </h3>
+                        {t.isPremium && (
+                          <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 uppercase tracking-wider">Pro</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-on-surface-variant mt-1.5 leading-relaxed line-clamp-2">{t.description}</p>
+                      <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                        {t.tags.slice(0, 3).map((tag) => (
+                          <span key={tag} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-variant/60 text-on-surface-variant">{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         );
@@ -1602,6 +1568,21 @@ function App() {
     }
   };
 
+   const isOnboarding = showOnboarding || cvs.length === 0;
+
+   if (isOnboarding) {
+     return (
+       <TemplateOnboarding
+         userTier={userTier}
+         onSelect={(template) => {
+           createCV('My CV');
+           setTemplate(template);
+           setShowOnboarding(false);
+         }}
+       />
+     );
+   }
+
    return (
      <div className="bg-background text-on-background min-h-screen flex flex-col font-body-md overflow-hidden">
        {/* AI Error Toast */}
@@ -1668,13 +1649,13 @@ function App() {
                    </div>
                  ))}
                  <div className="border-t border-outline-variant my-1"></div>
-                 <button onClick={handleCreateCV} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-surface-variant/50">
-                   <Icon name="add" className="text-[16px]" /> New CV
-                 </button>
-               </div>
-             )}
-           </div>
-           {/* Mobile CV selector */}
+                  <button onMouseDown={(e) => { e.stopPropagation(); handleCreateCV(); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-surface-variant/50">
+                    <Icon name="add" className="text-[16px]" /> New CV
+                  </button>
+                </div>
+              )}
+            </div>
+            {/* Mobile CV selector */}
            <div className="sm:hidden relative" ref={cvMenuRef}>
              <button
                onClick={() => setShowCvMenu(!showCvMenu)}
@@ -1698,13 +1679,13 @@ function App() {
                    </div>
                  ))}
                  <div className="border-t border-outline-variant my-1"></div>
-                 <button onClick={handleCreateCV} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-surface-variant/50">
-                   <Icon name="add" className="text-[16px]" /> New CV
-                 </button>
-               </div>
-             )}
-           </div>
-        </div>
+                  <button onMouseDown={(e) => { e.stopPropagation(); handleCreateCV(); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-surface-variant/50">
+                    <Icon name="add" className="text-[16px]" /> New CV
+                  </button>
+                </div>
+              )}
+            </div>
+         </div>
         <div className="flex items-center gap-1 sm:gap-2">
           <input
             ref={fileInputRef}
@@ -1835,15 +1816,19 @@ function App() {
 
         {/* Left Panel: Editor */}
         <section className={`bg-surface flex border-r border-outline-variant h-full overflow-hidden shrink-0 ${activeTab === 'pricing' ? 'w-full' : 'w-full md:w-[40%] lg:w-[45%]'}`}>
-          {/* Vertical Sidebar - Desktop */}
+           {/* Vertical Sidebar - Desktop */}
           <nav className="hidden sm:flex w-16 lg:w-20 shrink-0 bg-surface-container-low border-r border-outline-variant flex-col items-center py-3 gap-0.5 overflow-y-auto no-scrollbar">
-            {formTabs.map((tab) => (
+            {/* Design Group — FIRST for template-first UX */}
+            <div className="mb-0.5 px-2 lg:px-3 w-full">
+              <span className="text-[8px] lg:text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-[0.15em] block text-center">{t('sidebar.design')}</span>
+            </div>
+            {designTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`w-12 lg:w-16 py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
-                  activeTab === tab.id 
-                    ? 'bg-primary-container/30 text-primary font-medium' 
+                  activeTab === tab.id
+                    ? 'bg-primary-container/30 text-primary font-medium'
                     : 'text-on-surface-variant hover:bg-surface-variant/60 hover:text-on-surface'
                 }`}
                 title={tab.label}
@@ -1853,13 +1838,31 @@ function App() {
               </button>
             ))}
             <div className="w-8 h-px bg-outline-variant/50 my-1.5"></div>
+            {/* Content Group */}
+            {contentTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`w-12 lg:w-16 py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? 'bg-primary-container/30 text-primary font-medium'
+                    : 'text-on-surface-variant hover:bg-surface-variant/60 hover:text-on-surface'
+                }`}
+                title={tab.label}
+              >
+                <Icon name={tab.icon} className="text-[20px] lg:text-[22px]" filled={activeTab === tab.id} />
+                <span className="text-[9px] lg:text-[10px] font-medium leading-tight">{tab.short}</span>
+              </button>
+            ))}
+            <div className="w-8 h-px bg-outline-variant/50 my-1.5"></div>
+            {/* Tools Group */}
             {toolTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`w-12 lg:w-16 py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
-                  activeTab === tab.id 
-                    ? 'bg-primary-container/30 text-primary font-medium' 
+                  activeTab === tab.id
+                    ? 'bg-primary-container/30 text-primary font-medium'
                     : 'text-on-surface-variant hover:bg-surface-variant/60 hover:text-on-surface'
                 }`}
                 title={tab.label}
@@ -1869,16 +1872,16 @@ function App() {
               </button>
             ))}
           </nav>
-          
+
           {/* Mobile Bottom Navigation */}
           <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-container-low border-t border-outline-variant flex items-center justify-around py-1 px-1 safe-area-bottom">
-            {formTabs.map((tab) => (
+            {[designTabs[0], ...contentTabs.slice(0, 3)].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex-1 py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
-                  activeTab === tab.id 
-                    ? 'bg-primary-container/30 text-primary' 
+                  activeTab === tab.id
+                    ? 'bg-primary-container/30 text-primary'
                     : 'text-on-surface-variant'
                 }`}
               >
@@ -1887,13 +1890,13 @@ function App() {
               </button>
             ))}
             <div className="w-px h-6 bg-outline-variant/50 mx-1"></div>
-            {toolTabs.slice(0, 3).map((tab) => (
+            {[...toolTabs.slice(0, 2)].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex-1 py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
-                  activeTab === tab.id 
-                    ? 'bg-primary-container/30 text-primary' 
+                  activeTab === tab.id
+                    ? 'bg-primary-container/30 text-primary'
                     : 'text-on-surface-variant'
                 }`}
               >
@@ -1928,6 +1931,38 @@ function App() {
               </div>
             </div>
             <div className="flex items-center gap-1 sm:gap-2">
+              {/* Quick Template Switcher */}
+              <div className="relative" ref={templateSwitcherRef}>
+                <button
+                  onClick={() => setShowTemplateSwitcher(!showTemplateSwitcher)}
+                  className="hidden md:flex items-center gap-1.5 h-9 sm:h-10 px-3 rounded-full bg-surface border border-surface-variant text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors text-xs sm:text-sm"
+                >
+                  <Icon name="palette" className="text-[16px] text-primary" />
+                  <span className="max-w-[100px] truncate">{TEMPLATE_META[currentTemplate]?.name || 'Template'}</span>
+                  <Icon name="expand_more" className={`text-[16px] transition-transform ${showTemplateSwitcher ? 'rotate-180' : ''}`} />
+                </button>
+                {showTemplateSwitcher && (
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-surface border border-outline-variant rounded-xl shadow-xl z-50 py-2 max-h-80 overflow-y-auto">
+                    <div className="px-3 py-1.5 text-[10px] font-medium text-on-surface-variant uppercase tracking-wider">{t('sections.design')}</div>
+                    {Object.values(TEMPLATE_META).map((tmpl) => (
+                      <button
+                        key={tmpl.id}
+                        onClick={() => { setTemplate(tmpl.id as any); setShowTemplateSwitcher(false); }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-variant/40 transition-colors ${currentTemplate === tmpl.id ? 'bg-primary-container/10' : ''}`}
+                      >
+                        <div className="w-8 h-10 rounded border border-outline-variant overflow-hidden shrink-0" style={{ background: tmpl.colors[2] || '#fff' }}>
+                          <div className="w-full h-full opacity-50" style={{ background: tmpl.colors[0] }}></div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-xs font-medium truncate ${currentTemplate === tmpl.id ? 'text-primary' : 'text-on-surface'}`}>{tmpl.name}</div>
+                          <div className="text-[10px] text-on-surface-variant truncate">{tmpl.tags.slice(0, 2).join(' · ')}</div>
+                        </div>
+                        {currentTemplate === tmpl.id && <Icon name="check" className="text-[16px] text-primary shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.1))}
                 className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-surface border border-surface-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 shadow-sm transition-colors"
