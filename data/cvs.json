@@ -25,10 +25,20 @@
       "id": "35c7363e-3fc9-440c-ae9a-baa2ae6e4ed6",
       "name": "My CV",
       "data": "{\"personalInfo\":{\"fullName\":\"ALEXANDER STERLING\",\"jobTitle\":\"Chief Executive Officer\",\"email\":\"alexander.s@sterling.co\",\"phone\":\"+1 (555) 019-2834\",\"address\":\"San Francisco, CA\",\"summary\":\"Visionary executive leader with over 15 years of experience scaling global technology operations. Proven track record in strategic restructuring, accelerating revenue growth by 300% across EMEA and APAC regions. Adept at navigating complex market dynamics and forging high-level strategic partnerships.\",\"linkedin\":\"linkedin.com/in/alexsterling\",\"portfolio\":\"sterling.co\",\"github\":\"github.com/alexsterling\"},\"experiences\":[{\"id\":\"4afdef56-5b31-4d93-892e-360cfb869ef3\",\"company\":\"Global Tech Holdings\",\"position\":\"Chief Executive Officer\",\"startDate\":\"2018-01\",\"endDate\":\"Present\",\"bulletPoints\":\"<ul><li>Spearheaded global restructuring initiative, resulting in a 40% reduction in operational redundancies.</li><li>Directed successful acquisition and integration of three international competitors.</li><li>Expanded market share by 25% in the first fiscal year through strategic product alignment.</li></ul>\"},{\"id\":\"f00474a8-4b55-439c-946d-16b496d217ea\",\"company\":\"Innovate Solutions Group\",\"position\":\"Chief Operating Officer\",\"startDate\":\"2012-06\",\"endDate\":\"2017-12\",\"bulletPoints\":\"<ul><li>Architected scalable operational frameworks that supported 500% employee growth.</li><li>Maintained core profitability margins while doubling R&D investment.</li><li>Implemented lean management methodologies, reducing project turnaround time by 15%.</li></ul>\"}],\"educations\":[{\"id\":\"d5e73b34-5b2e-4fbf-b364-a99d7ace645c\",\"school\":\"Harvard Business School\",\"degree\":\"Master of Business Administration\",\"startDate\":\"2008-09\",\"endDate\":\"2010-06\"},{\"id\":\"e1cb3f96-98e3-4466-a053-2371c1fbe3b4\",\"school\":\"Stanford University\",\"degree\":\"B.S. in Economics\",\"startDate\":\"2002-09\",\"endDate\":\"2006-06\"}],\"skills\":[\"Strategic Planning\",\"Global Operations\",\"Mergers & Acquisitions\",\"Innovation Management\",\"Fiscal Responsibility\"]}",
-      "template": "tech",
+      "template": "standard",
       "primary_color": "#0061a4",
       "font_family": "sans",
-      "updated_at": "2026-05-17T17:07:48.478Z"
+      "updated_at": "2026-05-17T20:08:04.237Z"
+    },
+    {
+      "user_id": "anonymous",
+      "id": "5e3bf679-80ae-40b8-a1f8-9aec7be5f42e",
+      "name": "My CV",
+      "data": "{\"personalInfo\":{\"fullName\":\"ALEXANDER STERLING\",\"jobTitle\":\"Chief Executive Officer\",\"email\":\"alexander.s@sterling.co\",\"phone\":\"+1 (555) 019-2834\",\"address\":\"San Francisco, CA\",\"summary\":\"Visionary executive leader with over 15 years of experience scaling global technology operations...\",\"linkedin\":\"linkedin.com/in/alexsterling\",\"portfolio\":\"sterling.co\",\"github\":\"github.com/alexsterling\"},\"experiences\":[{\"id\":\"4dc059ca-e358-4594-b2c8-940822b214cd\",\"company\":\"Global Tech Holdings\",\"position\":\"Chief Executive Officer\",\"startDate\":\"2018-01\",\"endDate\":\"Present\",\"bulletPoints\":\"<ul><li>Spearheaded global restructuring initiative...</li></ul>\"},{\"id\":\"7311f62b-254d-4cc9-90ef-1f32a5981da4\",\"company\":\"Innovate Solutions Group\",\"position\":\"Chief Operating Officer\",\"startDate\":\"2012-06\",\"endDate\":\"2017-12\",\"bulletPoints\":\"<ul><li>Architected scalable operational frameworks...</li></ul>\"}],\"educations\":[{\"id\":\"0573a686-9718-4420-bc93-72d6850d3c11\",\"school\":\"Harvard Business School\",\"degree\":\"MBA\",\"startDate\":\"2008-09\",\"endDate\":\"2010-06\"},{\"id\":\"b1ce0d68-9ee4-4f79-bdb1-78e5bbfea7b9\",\"school\":\"Stanford University\",\"degree\":\"B.S. in Economics\",\"startDate\":\"2002-09\",\"endDate\":\"2006-06\"}],\"skills\":[\"Strategic Planning\",\"Global Operations\",\"Mergers & Acquisitions\",\"Innovation Management\",\"Fiscal Responsibility\"]}",
+      "template": "standard",
+      "primary_color": "#0061a4",
+      "font_family": "sans",
+      "updated_at": "2026-05-17T20:19:57.185Z"
     }
   ]
 }

@@ -4,10 +4,12 @@ import type { CVData, CVProject } from '../store/useCVStore';
 const API_BASE = '/api';
 
 // ── POST generic: gọi API, tự động parse JSON, bắn lỗi nếu không OK ──
-async function post<T = any>(path: string, body: unknown): Promise<T> {
+async function post<T = any>(path: string, body: unknown, token?: string): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -18,8 +20,10 @@ async function post<T = any>(path: string, body: unknown): Promise<T> {
 }
 
 // ── GET generic ──
-async function get<T = any>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
+async function get<T = any>(path: string, token?: string): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, { headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `Request failed (${res.status})`);
@@ -28,8 +32,10 @@ async function get<T = any>(path: string): Promise<T> {
 }
 
 // ── DELETE generic ──
-async function del<T = any>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
+async function del<T = any>(path: string, token?: string): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, { method: 'DELETE', headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `Request failed (${res.status})`);
@@ -79,20 +85,20 @@ export async function matchJD(cvData: CVData, jdText: string, lang: string) {
 //  CV CRUD — đồng bộ cloud
 // ═══════════════════════════
 
-export async function saveCVToCloud(cv: CVProject): Promise<void> {
-  await post('/cv/save', { cv });
+export async function saveCVToCloud(cv: CVProject, token?: string): Promise<void> {
+  await post('/cv/save', { cv }, token);
 }
 
-export async function loadCVsFromCloud(): Promise<{ cvs: any[] }> {
-  return get('/cv/load');
+export async function loadCVsFromCloud(token?: string): Promise<{ cvs: any[] }> {
+  return get('/cv/load', token);
 }
 
-export async function listCVsFromCloud(): Promise<{ cvs: { id: string; name: string; template: string; updatedAt: string }[] }> {
-  return get('/cv/list');
+export async function listCVsFromCloud(token?: string): Promise<{ cvs: { id: string; name: string; template: string; updatedAt: string }[] }> {
+  return get('/cv/list', token);
 }
 
-export async function deleteCVFromCloud(id: string): Promise<void> {
-  await del(`/cv/delete/${id}`);
+export async function deleteCVFromCloud(id: string, token?: string): Promise<void> {
+  await del(`/cv/delete/${id}`, token);
 }
 
 // ═══════════════════════════
@@ -117,6 +123,14 @@ export async function createCheckoutSession(priceId: string) {
 
 export async function importLinkedIn(pdfText: string) {
   return post('/import-linkedin', { pdfText });
+}
+
+// ═══════════════════════════
+//  Tailor CV — 1-click tailor
+// ═══════════════════════════
+
+export async function tailorCV(cvData: CVData, jobDescription: string, lang: string) {
+  return post('/tailor', { cvData, jobDescription, lang });
 }
 
 // ═══════════════════════════

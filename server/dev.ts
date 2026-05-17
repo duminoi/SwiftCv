@@ -329,6 +329,41 @@ app.post('/api/stripe/webhook', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+//  TAILOR CV — 1-click tailor CV theo JD
+// ═══════════════════════════════════════════
+
+app.post('/api/tailor', async (req, res) => {
+  try {
+    const { cvData, jobDescription, lang = 'en' } = req.body;
+    if (!cvData || !jobDescription) return res.status(400).json({ error: 'cvData and jobDescription required' });
+    const language = lang === 'vi' ? 'Vietnamese' : 'English';
+    const result = await callAI(
+      `You are an expert ATS optimization consultant. Your task is to tailor the provided CV to match the job description.
+Return ONLY valid JSON with:
+{
+  tailoredCV: { personalInfo: { summary: string }, experiences: [{ id: string, company: string, position: string, startDate: string, endDate: string, bulletPoints: string }], skills: string[] },
+  changes: [{ section: string, original: string, tailored: string, reason: string }]
+}
+Rules:
+- Keep ALL truthful content. Do NOT fabricate experience.
+- Rewrite summary to highlight JD-relevant keywords.
+- Rewrite bullet points to emphasize matching skills and achievements.
+- Add relevant missing skills that are implied by experience (max 3).
+- In ${language}.`,
+      `Job Description:\n${jobDescription}\n\nCurrent CV:\n${JSON.stringify(cvData, null, 2)}`
+    );
+    const parsed = safeParseJSON(result);
+    if (!parsed.tailoredCV || !parsed.changes) {
+      throw new Error('Invalid tailor response structure');
+    }
+    res.json(parsed);
+  } catch (err: any) {
+    console.error('[Tailor] AI error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════
 //  LINKEDIN IMPORT — parse dữ liệu từ LinkedIn PDF
 // ═══════════════════════════════════════════
 
