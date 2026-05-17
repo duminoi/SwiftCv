@@ -86,8 +86,6 @@ export function AppLayout() {
     e.target.value = '';
   };
 
-  const isEditor = location.pathname === '/';
-
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col text-sm overflow-hidden">
       <header className="h-14 sm:h-[56px] bg-white/80 backdrop-blur-sm flex items-center justify-between px-3 sm:px-4 border-b border-surface-border shrink-0 sticky top-0 z-30">

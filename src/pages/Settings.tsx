@@ -5,7 +5,6 @@ import { Icon } from '../components/Icon';
 export default function Settings() {
   const { t, i18n } = useTranslation();
   const { language, setLanguage, primaryColor, setPrimaryColor, fontFamily, setFontFamily, resetData, data, importData } = useCVStore();
-  const fileInputRef = { current: null as HTMLInputElement | null };
 
   const handleExportJSON = () => {
     const jsonStr = JSON.stringify(data, null, 2);

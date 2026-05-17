@@ -27,19 +27,18 @@ import { TEMPLATE_META, CATEGORY_LABELS, CATEGORY_ORDER } from '../data/template
 import type { TemplateCategory } from '../data/templateMeta';
 import { Icon } from '../components/Icon';
 import { InputField } from '../components/InputField';
-import { ScoreGauge } from '../components/ScoreGauge';
 import { TailorReview } from '../components/TailorReview';
-import { analyzeCV as apiAnalyze, rewriteSummary, rewriteBullets, suggestSkills, generateSummary, tailorCV } from '../services/api';
+import { rewriteSummary, rewriteBullets, suggestSkills, generateSummary, tailorCV } from '../services/api';
 
 export default function CVEditor() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { getToken } = useAuth();
   const {
     data, updatePersonalInfo, addExperience, updateExperience, removeExperience,
     addEducation, updateEducation, removeEducation, addSkill, removeSkill,
-    language, setLanguage, currentTemplate, setTemplate, primaryColor, setPrimaryColor,
-    fontFamily, setFontFamily, resetData, importData,
-    cvs, currentCvId, createCV, switchCV, deleteCV, renameCV,
+    language, currentTemplate, setTemplate, primaryColor,
+    fontFamily, importData,
+    cvs, currentCvId, createCV,
     userTier,
   } = useCVStore();
 
@@ -163,9 +162,9 @@ export default function CVEditor() {
       const opt = {
         margin: 0,
         filename: `CV_${data.personalInfo.fullName.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 1 },
+        image: { type: 'jpeg' as const, quality: 1 },
         html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
       };
       await html2pdf().set(opt).from(element).save();
     } catch (error) {

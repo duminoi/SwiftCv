@@ -11,7 +11,7 @@ interface TailorReviewProps {
   onReject: () => void;
 }
 
-export function TailorReview({ originalData, tailoredData, changes, onAcceptAll, onAcceptSection, onReject }: TailorReviewProps) {
+export function TailorReview({ changes, onAcceptAll, onAcceptSection, onReject }: TailorReviewProps) {
   const [acceptedSections, setAcceptedSections] = useState<Set<string>>(new Set());
 
   const handleAcceptSection = (section: string) => {
